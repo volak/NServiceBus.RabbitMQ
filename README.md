@@ -1,24 +1,12 @@
-# RabbitMQ Transport for NServiceBus
+# RabbitMqNext Transport for NServiceBus
 
-Install this to enable NServiceBus to facilitate messaging over RabbitMQ
+This is a fork of the official rabbitmq transport at [Particular/NServiceBus.RabbitMQ](https://github.com/Particular/NServiceBus.RabbitMQ) except this version uses the independent RabbitMq client [clearctvm/RabbitMqNext](https://github.com/clearctvm/RabbitMqNext)
+
+## Why?
+Well the reason why RabbitMqNext exists is because they found the main Rabbit client bottlenecking their apps with all the blocking threads.  If you check the concurrency visualizer while running the official client you'll notice ~90% of your app's time is spent waiting.  RabbitMqNext was built for async/await out of the box and you may find some performance boost by using this transport instead.
+
+There have been many requests for an official async/await rabbit client - we're told to expect it Q2/Q3 2017.
 
 ## Installation
 
-Before doing anything else, make sure you have RabbitMQ up and running in your environment. Also make sure it is accessible from all the machines in your setup.
-
-1. Add NServiceBus.RabbitMQ to your project(s). The easiest way to do that is by installing the [NServiceBus.RabbitMQ nuget package](https://www.nuget.org/packages/NServiceBus.RabbitMQ).
-
-2. In your app.config make sure to provides the necessary connection information needed to communicate to the RabbitMQ server. A typical setup would be:
-
-````xml
-<connectionStrings>
-  <add name="NServiceBus/Transport" connectionString="host=localhost"/>
-</connectionStrings>
-````
-
-## Samples
-
-See https://github.com/Particular/NServiceBus.RabbitMQ.Samples
-
-## Maintainers
-The following team is responsible for this repository: @Particular/rabbitmq-transport-maintainers
+Exactly the same as NServiceBus.RabbitMQ - its a drop in replacement
