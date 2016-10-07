@@ -6,12 +6,12 @@
     using System.Threading.Tasks;
     using NUnit.Framework;
     using Settings;
+    using RabbitMqNext;
 
     class RabbitMqContext
     {
         protected async void MakeSureQueueAndExchangeExists(string queueName)
         {
-            using (var connection = await connectionFactory.CreateAdministrationConnection())
             using (var channel = await connection.CreateChannel())
             {
                 await channel.QueueDeclare(queueName, true, false, false, false, null, true);
@@ -26,7 +26,6 @@
 
         async void DeleteExchange(string exchangeName)
         {
-            using (var connection = await connectionFactory.CreateAdministrationConnection())
             using (var channel = await connection.CreateChannel())
             {
                 try
@@ -44,7 +43,7 @@
         public virtual int MaximumConcurrency => 1;
 
         [SetUp]
-        public void SetUp()
+        public async Task SetUp()
         {
             routingTopology = new ConventionalRoutingTopology(true);
             receivedMessages = new BlockingCollection<IncomingMessage>();
@@ -67,18 +66,18 @@
                 config.Host = "localhost";
             }
 
-            connectionFactory = new ConnectionFactory(config);
-            channelProvider = new ChannelProvider(connectionFactory, routingTopology, true);
+            connection = await global::RabbitMqNext.ConnectionFactory.Connect(config.Host, config.VirtualHost, config.UserName, config.Password);
+            channelProvider = new ChannelProvider(connection, routingTopology, true);
 
             messageDispatcher = new MessageDispatcher(channelProvider);
 
-            var purger = new QueuePurger(connectionFactory);
+            var purger = new QueuePurger(connection);
 
-            messagePump = new MessagePump(connectionFactory, new MessageConverter(), "Unit test", channelProvider, purger, TimeSpan.FromMinutes(2), 3, 0);
+            messagePump = new MessagePump(connection, new MessageConverter(), "Unit test", channelProvider, purger, TimeSpan.FromMinutes(2), 3, 0);
 
             MakeSureQueueAndExchangeExists(ReceiverQueue);
 
-            subscriptionManager = new SubscriptionManager(connectionFactory, routingTopology, ReceiverQueue);
+            subscriptionManager = new SubscriptionManager(connection, routingTopology, ReceiverQueue);
 
             messagePump.Init(messageContext =>
             {
@@ -118,7 +117,7 @@
 
         protected const string ReceiverQueue = "testreceiver";
         protected MessageDispatcher messageDispatcher;
-        protected ConnectionFactory connectionFactory;
+        protected IConnection connection;
         private ChannelProvider channelProvider;
         protected MessagePump messagePump;
         BlockingCollection<IncomingMessage> receivedMessages;

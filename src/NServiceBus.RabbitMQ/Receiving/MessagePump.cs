@@ -93,7 +93,7 @@
             
             var startTasks = new List<Task>();
             for (var i = 0; i < maxConcurrency; i++)
-                startTasks.Add(channel.BasicConsume(ConsumeMode.ParallelWithBufferCopy, this, settings.InputQueue, consumerTag, false, false, null, true));
+                startTasks.Add(channel.BasicConsume(ConsumeMode.ParallelWithBufferCopy, this, settings.InputQueue, $"{consumerTag}.{i}", false, false, null, true));
             Task.WhenAll(startTasks).Wait();
         }
 
