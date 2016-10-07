@@ -14,7 +14,7 @@
         static readonly TransportTransaction transportTranaction = new TransportTransaction();
         static readonly ContextBag contextBag = new ContextBag();
 
-        readonly ConnectionFactory connectionFactory;
+        IConnection connection;
         readonly MessageConverter messageConverter;
         readonly string consumerTag;
         readonly IChannelProvider channelProvider;
@@ -33,15 +33,14 @@
         // Start
         int maxConcurrency;
         CancellationTokenSource messageProcessing;
-        IConnection connection;
         IChannel channel;
 
         // Stop
         TaskCompletionSource<bool> connectionShutdownCompleted;
 
-        public MessagePump(ConnectionFactory connectionFactory, MessageConverter messageConverter, string consumerTag, IChannelProvider channelProvider, QueuePurger queuePurger, TimeSpan timeToWaitBeforeTriggeringCircuitBreaker, int prefetchMultiplier, ushort overriddenPrefetchCount)
+        public MessagePump(IConnection connection, MessageConverter messageConverter, string consumerTag, IChannelProvider channelProvider, QueuePurger queuePurger, TimeSpan timeToWaitBeforeTriggeringCircuitBreaker, int prefetchMultiplier, ushort overriddenPrefetchCount)
         {
-            this.connectionFactory = connectionFactory;
+            this.connection = connection;
             this.messageConverter = messageConverter;
             this.consumerTag = consumerTag;
             this.channelProvider = channelProvider;
@@ -70,9 +69,7 @@
         {
             maxConcurrency = limitations.MaxConcurrency;
             messageProcessing = new CancellationTokenSource();
-
-            connection = connectionFactory.CreateConnection($"{settings.InputQueue} MessagePump").Result;
-
+            
             channel = connection.CreateChannel().Result;
 
             long prefetchCount;

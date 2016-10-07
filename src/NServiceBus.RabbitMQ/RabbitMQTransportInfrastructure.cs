@@ -9,21 +9,34 @@
     using Routing;
     using Settings;
     using RabbitMqNext;
+    using Logging;
 
     [SkipWeaving]
     class RabbitMQTransportInfrastructure : TransportInfrastructure, IDisposable
     {
+        readonly static ILog Logger = LogManager.GetLogger("RabbitMqTransport");
         readonly SettingsHolder settings;
-        readonly ConnectionFactory connectionFactory;
         readonly ChannelProvider channelProvider;
         IRoutingTopology routingTopology;
+        IConnection connection;
 
         public RabbitMQTransportInfrastructure(SettingsHolder settings, string connectionString)
         {
+            RabbitMqNext.LogAdapter.LogDebugFn = (@class, message, ex) => Logger.Debug($"{@class} {message}", ex);
+            RabbitMqNext.LogAdapter.LogWarnFn= (@class, message, ex) => Logger.Warn($"{@class} {message}", ex);
+            RabbitMqNext.LogAdapter.LogErrorFn = (@class, message, ex) => Logger.Error($"{@class} {message}", ex);
+
             this.settings = settings;
 
             var connectionConfiguration = new ConnectionStringParser(settings).Parse(connectionString);
-            connectionFactory = new ConnectionFactory(connectionConfiguration);
+            connection = global::RabbitMqNext.ConnectionFactory.Connect(
+                connectionConfiguration.Host,
+                vhost: connectionConfiguration.VirtualHost,
+                username: connectionConfiguration.UserName,
+                password: connectionConfiguration.Password,
+                recoverySettings: new RabbitMqNext.AutoRecoverySettings { Enabled = true, RecoverBindings = true },
+                maxChannels: connectionConfiguration.MaxChannels
+                ).Result;
 
             CreateTopology();
 
@@ -33,7 +46,7 @@
                 usePublisherConfirms = true;
             }
 
-            channelProvider = new ChannelProvider(connectionFactory, routingTopology, usePublisherConfirms);
+            channelProvider = new ChannelProvider(connection, routingTopology, usePublisherConfirms);
 
             RequireOutboxConsent = false;
         }
@@ -50,7 +63,7 @@
         {
             return new TransportReceiveInfrastructure(
                     () => CreateMessagePump(),
-                    () => new QueueCreator(connectionFactory, routingTopology, settings.DurableMessagesEnabled()),
+                    () => new QueueCreator(connection, routingTopology, settings.DurableMessagesEnabled()),
                     () => Task.FromResult(ObsoleteAppSettings.Check()));
         }
 
@@ -63,7 +76,7 @@
 
         public override TransportSubscriptionInfrastructure ConfigureSubscriptionInfrastructure()
         {
-            return new TransportSubscriptionInfrastructure(() => new SubscriptionManager(connectionFactory, routingTopology, settings.LocalAddress()));
+            return new TransportSubscriptionInfrastructure(() => new SubscriptionManager(connection, routingTopology, settings.LocalAddress()));
         }
 
         public override string ToTransportAddress(LogicalAddress logicalAddress)
@@ -132,7 +145,7 @@
 
             var consumerTag = $"{hostDisplayName} - {settings.EndpointName()}";
 
-            var queuePurger = new QueuePurger(connectionFactory);
+            var queuePurger = new QueuePurger(connection);
 
             TimeSpan timeToWaitBeforeTriggeringCircuitBreaker;
             if (!settings.TryGet(SettingsKeys.TimeToWaitBeforeTriggeringCircuitBreaker, out timeToWaitBeforeTriggeringCircuitBreaker))
@@ -152,7 +165,7 @@
                 prefetchCount = 0;
             }
 
-            return new MessagePump(connectionFactory, messageConverter, consumerTag, channelProvider, queuePurger, timeToWaitBeforeTriggeringCircuitBreaker, prefetchMultiplier, prefetchCount);
+            return new MessagePump(connection, messageConverter, consumerTag, channelProvider, queuePurger, timeToWaitBeforeTriggeringCircuitBreaker, prefetchMultiplier, prefetchCount);
         }
     }
 }

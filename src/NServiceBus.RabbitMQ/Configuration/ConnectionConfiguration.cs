@@ -45,7 +45,7 @@
             UseTls = false;
             CertPath = "";
             CertPassphrase = null;
-            MaxChannels = 5;
+            MaxChannels = 150;
 
             SetDefaultClientProperties(settings);
         }

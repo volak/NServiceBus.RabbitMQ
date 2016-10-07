@@ -68,8 +68,8 @@
       <Private>False</Private>
     </Reference>
     <Reference Include="RabbitMqNext, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL">
-      <HintPath>..\packages\RabbitMqNext.1.0.12\lib\net461\RabbitMqNext.dll</HintPath>
-      <Private>True</Private>
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\..\..\RabbitMqNext\src\RabbitMqNext\bin\Debug\RabbitMqNext.dll</HintPath>
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.Configuration" />
@@ -87,7 +87,6 @@
     <Compile Include="Configuration\SettingsKeys.cs" />
     <Compile Include="Routing\DefaultRoutingKeyConvention.cs" />
     <Compile Include="Configuration\ConnectionConfiguration.cs" />
-    <Compile Include="Connection\ConnectionFactory.cs" />
     <Compile Include="Connection\IChannelProvider.cs" />
     <Compile Include="InternalsVisibleTo.cs" />
     <Compile Include="Receiving\MessagePump.cs" />

@@ -28,17 +28,26 @@
 
         public async Task Publish(IChannel channel, Type type, OutgoingMessage message, BasicProperties properties)
         {
-            await channel.BasicPublish(ExchangeName(), GetRoutingKeyForPublish(type), false, properties, message.Body).ConfigureAwait(false);
+            if (channel.IsConfirmationEnabled)
+                await channel.BasicPublishWithConfirmation(ExchangeName(), GetRoutingKeyForPublish(type), false, properties, new ArraySegment<byte>(message.Body)).ConfigureAwait(false);
+            else
+                await channel.BasicPublish(ExchangeName(), GetRoutingKeyForPublish(type), false, properties, message.Body).ConfigureAwait(false);
         }
 
         public async Task Send(IChannel channel, string address, OutgoingMessage message, BasicProperties properties)
         {
-            await channel.BasicPublish(string.Empty, address, true, properties, message.Body).ConfigureAwait(false);
+            if (channel.IsConfirmationEnabled)
+                await channel.BasicPublishWithConfirmation(string.Empty, address, true, properties, new ArraySegment<byte>(message.Body)).ConfigureAwait(false);
+            else
+                await channel.BasicPublish(string.Empty, address, true, properties, message.Body).ConfigureAwait(false);
         }
 
         public async Task RawSendInCaseOfFailure(IChannel channel, string address, byte[] body, BasicProperties properties)
         {
-            await channel.BasicPublish(string.Empty, address, true, properties, body).ConfigureAwait(false);
+            if (channel.IsConfirmationEnabled)
+                await channel.BasicPublishWithConfirmation(string.Empty, address, true, properties, new ArraySegment<byte>(body)).ConfigureAwait(false);
+            else
+                await channel.BasicPublish(string.Empty, address, true, properties, body).ConfigureAwait(false);
         }
 
         public Task Initialize(IChannel channel, string main)

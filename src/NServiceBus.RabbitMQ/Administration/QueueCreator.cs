@@ -1,16 +1,17 @@
 ﻿namespace NServiceBus.Transport.RabbitMQ
 {
+    using RabbitMqNext;
     using System.Threading.Tasks;
 
     class QueueCreator : ICreateQueues
     {
-        readonly ConnectionFactory connectionFactory;
+        readonly IConnection connection;
         readonly IRoutingTopology routingTopology;
         readonly bool durableMessagesEnabled;
 
-        public QueueCreator(ConnectionFactory connectionFactory, IRoutingTopology routingTopology, bool durableMessagesEnabled)
+        public QueueCreator(IConnection connection, IRoutingTopology routingTopology, bool durableMessagesEnabled)
         {
-            this.connectionFactory = connectionFactory;
+            this.connection = connection;
             this.routingTopology = routingTopology;
             this.durableMessagesEnabled = durableMessagesEnabled;
         }
@@ -31,7 +32,6 @@
 
         async Task CreateQueueIfNecessary(string receivingAddress)
         {
-            using (var connection = await connectionFactory.CreateAdministrationConnection().ConfigureAwait(false))
             using (var channel = await connection.CreateChannel().ConfigureAwait(false))
             {
                 await channel.QueueDeclare(receivingAddress, false, durableMessagesEnabled, false, false, null, true).ConfigureAwait(false);

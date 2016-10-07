@@ -1,19 +1,19 @@
+using RabbitMqNext;
 using System.Threading.Tasks;
 
 namespace NServiceBus.Transport.RabbitMQ
 {
     class QueuePurger
     {
-        readonly ConnectionFactory connectionFactory;
+        readonly IConnection connection;
 
-        public QueuePurger(ConnectionFactory connectionFactory)
+        public QueuePurger(IConnection connection)
         {
-            this.connectionFactory = connectionFactory;
+            this.connection = connection;
         }
 
         public async Task Purge(string queue)
         {
-            using (var connection = await connectionFactory.CreateAdministrationConnection().ConfigureAwait(false))
             using (var channel = await connection.CreateChannel().ConfigureAwait(false))
             {
                 await channel.QueuePurge(queue, true).ConfigureAwait(false);
