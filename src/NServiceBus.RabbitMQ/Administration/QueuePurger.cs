@@ -1,3 +1,5 @@
+using System.Threading.Tasks;
+
 namespace NServiceBus.Transport.RabbitMQ
 {
     class QueuePurger
@@ -9,12 +11,12 @@ namespace NServiceBus.Transport.RabbitMQ
             this.connectionFactory = connectionFactory;
         }
 
-        public void Purge(string queue)
+        public async Task Purge(string queue)
         {
-            using (var connection = connectionFactory.CreateAdministrationConnection())
-            using (var channel = connection.CreateModel())
+            using (var connection = await connectionFactory.CreateAdministrationConnection().ConfigureAwait(false))
+            using (var channel = await connection.CreateChannel().ConfigureAwait(false))
             {
-                channel.QueuePurge(queue);
+                await channel.QueuePurge(queue, true).ConfigureAwait(false);
             }
         }
     }

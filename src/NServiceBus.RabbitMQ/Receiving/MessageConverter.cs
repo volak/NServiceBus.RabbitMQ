@@ -4,8 +4,8 @@
     using System.Collections;
     using System.Collections.Generic;
     using System.Text;
-    using global::RabbitMQ.Client.Events;
     using Logging;
+    using RabbitMqNext;
 
     class MessageConverter
     {
@@ -14,36 +14,36 @@
             messageIdStrategy = DefaultMessageIdStrategy;
         }
 
-        public MessageConverter(Func<BasicDeliverEventArgs, string> messageIdStrategy)
+        public MessageConverter(Func<MessageDelivery, string> messageIdStrategy)
         {
             this.messageIdStrategy = messageIdStrategy;
         }
 
-        public string RetrieveMessageId(BasicDeliverEventArgs message) => messageIdStrategy(message);
+        public string RetrieveMessageId(MessageDelivery message) => messageIdStrategy(message);
 
-        public Dictionary<string, string> RetrieveHeaders(BasicDeliverEventArgs message)
+        public Dictionary<string, string> RetrieveHeaders(MessageDelivery message)
         {
-            var properties = message.BasicProperties;
+            var properties = message.properties;
 
             var headers = DeserializeHeaders(properties.Headers);
 
-            if (properties.IsReplyToPresent())
+            if (properties.IsReplyToPresent)
             {
                 headers[Headers.ReplyToAddress] = properties.ReplyTo;
             }
 
-            if (properties.IsCorrelationIdPresent())
+            if (properties.IsCorrelationIdPresent)
             {
                 headers[Headers.CorrelationId] = properties.CorrelationId;
             }
 
             //When doing native interop we only require the type to be set the "fullName" of the message
-            if (!headers.ContainsKey(Headers.EnclosedMessageTypes) && properties.IsTypePresent())
+            if (!headers.ContainsKey(Headers.EnclosedMessageTypes) && properties.IsTypePresent)
             {
                 headers[Headers.EnclosedMessageTypes] = properties.Type;
             }
 
-            if (properties.IsDeliveryModePresent())
+            if (properties.IsDeliveryModePresent)
             {
                 headers[Headers.NonDurableMessage] = (properties.DeliveryMode == 1).ToString();
             }
@@ -56,11 +56,11 @@
             return headers;
         }
 
-        string DefaultMessageIdStrategy(BasicDeliverEventArgs message)
+        string DefaultMessageIdStrategy(MessageDelivery message)
         {
-            var properties = message.BasicProperties;
+            var properties = message.properties;
 
-            if (!properties.IsMessageIdPresent() || string.IsNullOrWhiteSpace(properties.MessageId))
+            if (!properties.IsMessageIdPresent || string.IsNullOrWhiteSpace(properties.MessageId))
             {
                 throw new InvalidOperationException("A non-empty 'message-id' property is required when running NServiceBus on top of RabbitMQ. If this is an interop message, then set the 'message-id' property before publishing the message");
             }
@@ -130,7 +130,7 @@
             return null;
         }
 
-        readonly Func<BasicDeliverEventArgs, string> messageIdStrategy;
+        readonly Func<MessageDelivery, string> messageIdStrategy;
 
         static ILog Logger = LogManager.GetLogger(typeof(MessageConverter));
     }

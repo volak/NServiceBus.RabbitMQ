@@ -15,29 +15,28 @@
             this.durableMessagesEnabled = durableMessagesEnabled;
         }
 
-        public Task CreateQueueIfNecessary(QueueBindings queueBindings, string identity)
+        public async Task CreateQueueIfNecessary(QueueBindings queueBindings, string identity)
         {
             foreach (var receivingAddress in queueBindings.ReceivingAddresses)
             {
-                CreateQueueIfNecessary(receivingAddress);
+                await CreateQueueIfNecessary(receivingAddress).ConfigureAwait(false);
             }
 
             foreach (var sendingAddress in queueBindings.SendingAddresses)
             {
-                CreateQueueIfNecessary(sendingAddress);
+                await CreateQueueIfNecessary(sendingAddress).ConfigureAwait(false);
             }
-
-            return TaskEx.CompletedTask;
+            
         }
 
-        void CreateQueueIfNecessary(string receivingAddress)
+        async Task CreateQueueIfNecessary(string receivingAddress)
         {
-            using (var connection = connectionFactory.CreateAdministrationConnection())
-            using (var channel = connection.CreateModel())
+            using (var connection = await connectionFactory.CreateAdministrationConnection().ConfigureAwait(false))
+            using (var channel = await connection.CreateChannel().ConfigureAwait(false))
             {
-                channel.QueueDeclare(receivingAddress, durableMessagesEnabled, false, false, null);
+                await channel.QueueDeclare(receivingAddress, false, durableMessagesEnabled, false, false, null, true).ConfigureAwait(false);
 
-                routingTopology.Initialize(channel, receivingAddress);
+                await routingTopology.Initialize(channel, receivingAddress).ConfigureAwait(false);
             }
         }
     }

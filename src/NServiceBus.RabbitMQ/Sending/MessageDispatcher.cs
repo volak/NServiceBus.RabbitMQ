@@ -3,6 +3,7 @@
     using System.Collections.Generic;
     using System.Threading.Tasks;
     using Extensibility;
+    using RabbitMqNext;
 
     class MessageDispatcher : IDispatchMessages
     {
@@ -13,9 +14,9 @@
             this.channelProvider = channelProvider;
         }
 
-        public Task Dispatch(TransportOperations outgoingMessages, TransportTransaction transaction, ContextBag context)
+        public async Task Dispatch(TransportOperations outgoingMessages, TransportTransaction transaction, ContextBag context)
         {
-            var channel = channelProvider.GetPublishChannel();
+            var channel = await channelProvider.GetPublishChannel().ConfigureAwait(false);
 
             try
             {
@@ -34,7 +35,7 @@
                     tasks.Add(PublishMessage(operation, channel));
                 }
 
-                return tasks.Count == 1 ? tasks[0] : Task.WhenAll(tasks);
+                await (tasks.Count == 1 ? tasks[0] : Task.WhenAll(tasks)).ConfigureAwait(false);
             }
             finally
             {
@@ -45,7 +46,7 @@
         Task SendMessage(UnicastTransportOperation transportOperation, ConfirmsAwareChannel channel)
         {
             var message = transportOperation.Message;
-
+            
             var properties = channel.CreateBasicProperties();
             properties.Fill(message, transportOperation.DeliveryConstraints);
 

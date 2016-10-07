@@ -5,13 +5,13 @@
     using System.Globalization;
     using System.Linq;
     using System.Text;
-    using global::RabbitMQ.Client;
+    using global::RabbitMqNext;
     using DeliveryConstraints;
     using Performance.TimeToBeReceived;
 
     static class BasicPropertiesExtensions
     {
-        public static void Fill(this IBasicProperties properties, OutgoingMessage message, List<DeliveryConstraint> deliveryConstraints)
+        public static void Fill(this BasicProperties properties, OutgoingMessage message, List<DeliveryConstraint> deliveryConstraints)
         {
             properties.MessageId = message.MessageId;
 
@@ -26,10 +26,10 @@
             {
                 properties.Expiration = timeToBeReceived.MaxTime.TotalMilliseconds.ToString(CultureInfo.InvariantCulture);
             }
+            // Todo: not supported?
+            //properties.Persistent = !deliveryConstraints.Any(c => c is NonDurableDelivery);
 
-            properties.Persistent = !deliveryConstraints.Any(c => c is NonDurableDelivery);
-
-            properties.Headers = message.Headers.ToDictionary(p => p.Key, p => (object)p.Value);
+            //properties.Headers = message.Headers.ToDictionary(p => p.Key, p => (object)p.Value);
 
             string messageTypesHeader;
             if (message.Headers.TryGetValue(NServiceBus.Headers.EnclosedMessageTypes, out messageTypesHeader))
@@ -61,12 +61,12 @@
             }
         }
 
-        public static void SetConfirmationId(this IBasicProperties properties, ulong confirmationId)
+        public static void SetConfirmationId(this BasicProperties properties, ulong confirmationId)
         {
             properties.Headers[confirmationIdHeader] = confirmationId.ToString();
         }
 
-        public static bool TryGetConfirmationId(this IBasicProperties properties, out ulong confirmationId)
+        public static bool TryGetConfirmationId(this BasicProperties properties, out ulong confirmationId)
         {
             confirmationId = 0;
 

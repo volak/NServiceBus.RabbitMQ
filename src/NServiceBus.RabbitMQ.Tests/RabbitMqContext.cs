@@ -9,29 +9,29 @@
 
     class RabbitMqContext
     {
-        protected void MakeSureQueueAndExchangeExists(string queueName)
+        protected async void MakeSureQueueAndExchangeExists(string queueName)
         {
-            using (var connection = connectionFactory.CreateAdministrationConnection())
-            using (var channel = connection.CreateModel())
+            using (var connection = await connectionFactory.CreateAdministrationConnection())
+            using (var channel = await connection.CreateChannel())
             {
-                channel.QueueDeclare(queueName, true, false, false, null);
-                channel.QueuePurge(queueName);
+                await channel.QueueDeclare(queueName, true, false, false, false, null, true);
+                await channel.QueuePurge(queueName, true);
 
                 //to make sure we kill old subscriptions
                 DeleteExchange(queueName);
 
-                routingTopology.Initialize(channel, queueName);
+                await routingTopology.Initialize(channel, queueName);
             }
         }
 
-        void DeleteExchange(string exchangeName)
+        async void DeleteExchange(string exchangeName)
         {
-            using (var connection = connectionFactory.CreateAdministrationConnection())
-            using (var channel = connection.CreateModel())
+            using (var connection = await connectionFactory.CreateAdministrationConnection())
+            using (var channel = await connection.CreateChannel())
             {
                 try
                 {
-                    channel.ExchangeDelete(exchangeName, false);
+                    await channel.ExchangeDelete(exchangeName, null, true);
                 }
                 // ReSharper disable EmptyGeneralCatchClause
                 catch (Exception)
@@ -83,10 +83,10 @@
             messagePump.Init(messageContext =>
             {
                 receivedMessages.Add(new IncomingMessage(messageContext.MessageId, messageContext.Headers, messageContext.Body));
-                return TaskEx.CompletedTask;
+                return Task.CompletedTask;
             },
                 ErrorContext => Task.FromResult(ErrorHandleResult.Handled),
-                new CriticalError(_ => TaskEx.CompletedTask),
+                new CriticalError(_ => Task.CompletedTask),
                 new PushSettings(ReceiverQueue, "error", true, TransportTransactionMode.ReceiveOnly)
             ).GetAwaiter().GetResult();
 

@@ -4,11 +4,11 @@
     using System.Collections.Generic;
     using System.Text;
     using System.Threading.Tasks;
-    using global::RabbitMQ.Client.Events;
     using Janitor;
     using Performance.TimeToBeReceived;
     using Routing;
     using Settings;
+    using RabbitMqNext;
 
     [SkipWeaving]
     class RabbitMQTransportInfrastructure : TransportInfrastructure, IDisposable
@@ -117,7 +117,7 @@
 
             if (settings.HasSetting(SettingsKeys.CustomMessageIdStrategy))
             {
-                messageConverter = new MessageConverter(settings.Get<Func<BasicDeliverEventArgs, string>>(SettingsKeys.CustomMessageIdStrategy));
+                messageConverter = new MessageConverter(settings.Get<Func<MessageDelivery, string>>(SettingsKeys.CustomMessageIdStrategy));
             }
             else
             {

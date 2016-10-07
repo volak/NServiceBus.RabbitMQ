@@ -23,6 +23,8 @@
 
         public TimeSpan RetryDelay { get; set; }
 
+        public Int32 MaxChannels { get; set; }
+
         public bool UseTls { get; set; }
 
         public string CertPath { get; set; }
@@ -43,6 +45,7 @@
             UseTls = false;
             CertPath = "";
             CertPassphrase = null;
+            MaxChannels = 5;
 
             SetDefaultClientProperties(settings);
         }

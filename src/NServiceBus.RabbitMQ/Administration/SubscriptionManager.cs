@@ -17,26 +17,24 @@
             this.localQueue = localQueue;
         }
 
-        public Task Subscribe(Type eventType, ContextBag context)
+        public async Task Subscribe(Type eventType, ContextBag context)
         {
-            using (var connection = connectionFactory.CreateAdministrationConnection())
-            using (var channel = connection.CreateModel())
+            using (var connection = await connectionFactory.CreateAdministrationConnection().ConfigureAwait(false))
+            using (var channel = await connection.CreateChannel().ConfigureAwait(false))
             {
-                routingTopology.SetupSubscription(channel, eventType, localQueue);
+                await routingTopology.SetupSubscription(channel, eventType, localQueue).ConfigureAwait(false);
             }
-
-            return TaskEx.CompletedTask;
+            
         }
 
-        public Task Unsubscribe(Type eventType, ContextBag context)
+        public async Task Unsubscribe(Type eventType, ContextBag context)
         {
-            using (var connection = connectionFactory.CreateAdministrationConnection())
-            using (var channel = connection.CreateModel())
+            using (var connection = await connectionFactory.CreateAdministrationConnection().ConfigureAwait(false))
+            using (var channel = await connection.CreateChannel().ConfigureAwait(false))
             {
-                routingTopology.TeardownSubscription(channel, eventType, localQueue);
+                await routingTopology.TeardownSubscription(channel, eventType, localQueue).ConfigureAwait(false);
             }
-
-            return TaskEx.CompletedTask;
+            
         }
     }
 }

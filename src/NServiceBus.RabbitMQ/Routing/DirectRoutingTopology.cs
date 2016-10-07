@@ -1,7 +1,8 @@
 ﻿namespace NServiceBus.Transport.RabbitMQ
 {
     using System;
-    using global::RabbitMQ.Client;
+    using global::RabbitMqNext;
+    using System.Threading.Tasks;
 
     /// <summary>
     /// Route using a static routing convention for routing messages from publishers to subscribers using routing keys.
@@ -14,40 +15,41 @@
             this.useDurableExchanges = useDurableExchanges;
         }
 
-        public void SetupSubscription(IModel channel, Type type, string subscriberName)
+        public async Task SetupSubscription(IChannel channel, Type type, string subscriberName)
         {
-            CreateExchange(channel, ExchangeName());
-            channel.QueueBind(subscriberName, ExchangeName(), GetRoutingKeyForBinding(type));
+            await CreateExchange(channel, ExchangeName()).ConfigureAwait(false);
+            await channel.QueueBind(subscriberName, ExchangeName(), GetRoutingKeyForBinding(type), null, true).ConfigureAwait(false);
         }
 
-        public void TeardownSubscription(IModel channel, Type type, string subscriberName)
+        public async Task TeardownSubscription(IChannel channel, Type type, string subscriberName)
         {
-            channel.QueueUnbind(subscriberName, ExchangeName(), GetRoutingKeyForBinding(type), null);
+            await channel.QueueUnbind(subscriberName, ExchangeName(), GetRoutingKeyForBinding(type), null).ConfigureAwait(false);
         }
 
-        public void Publish(IModel channel, Type type, OutgoingMessage message, IBasicProperties properties)
+        public async Task Publish(IChannel channel, Type type, OutgoingMessage message, BasicProperties properties)
         {
-            channel.BasicPublish(ExchangeName(), GetRoutingKeyForPublish(type), false, properties, message.Body);
+            await channel.BasicPublish(ExchangeName(), GetRoutingKeyForPublish(type), false, properties, message.Body).ConfigureAwait(false);
         }
 
-        public void Send(IModel channel, string address, OutgoingMessage message, IBasicProperties properties)
+        public async Task Send(IChannel channel, string address, OutgoingMessage message, BasicProperties properties)
         {
-            channel.BasicPublish(string.Empty, address, true, properties, message.Body);
+            await channel.BasicPublish(string.Empty, address, true, properties, message.Body).ConfigureAwait(false);
         }
 
-        public void RawSendInCaseOfFailure(IModel channel, string address, byte[] body, IBasicProperties properties)
+        public async Task RawSendInCaseOfFailure(IChannel channel, string address, byte[] body, BasicProperties properties)
         {
-            channel.BasicPublish(string.Empty, address, true, properties, body);
+            await channel.BasicPublish(string.Empty, address, true, properties, body).ConfigureAwait(false);
         }
 
-        public void Initialize(IModel channel, string main)
+        public Task Initialize(IChannel channel, string main)
         {
+            return Task.CompletedTask;
             //nothing needs to be done for direct routing
         }
 
         string ExchangeName() => conventions.ExchangeName(null, null);
 
-        void CreateExchange(IModel channel, string exchangeName)
+        async Task CreateExchange(IChannel channel, string exchangeName)
         {
             if (exchangeName == AmqpTopicExchange)
             {
@@ -56,7 +58,7 @@
 
             try
             {
-                channel.ExchangeDeclare(exchangeName, ExchangeType.Topic, useDurableExchanges);
+                await channel.ExchangeDeclare(exchangeName, "topic", useDurableExchanges, false, null, true).ConfigureAwait(false);
             }
             // ReSharper disable EmptyGeneralCatchClause
             catch (Exception)

@@ -2,12 +2,12 @@
 {
     using System;
     using System.Security.Authentication;
-    using global::RabbitMQ.Client;
+    using System.Threading.Tasks;
+    using global::RabbitMqNext;
 
     class ConnectionFactory
     {
-        readonly global::RabbitMQ.Client.ConnectionFactory connectionFactory;
-        readonly object lockObject = new object();
+        readonly Func<String, Task<IConnection>> connectionFactory;
 
         public ConnectionFactory(ConnectionConfiguration connectionConfiguration)
         {
@@ -21,45 +21,27 @@
                 throw new ArgumentException("The connectionConfiguration has a null Host.", nameof(connectionConfiguration));
             }
 
-            connectionFactory = new global::RabbitMQ.Client.ConnectionFactory
-            {
-                HostName = connectionConfiguration.Host,
-                Port = connectionConfiguration.Port,
-                VirtualHost = connectionConfiguration.VirtualHost,
-                UserName = connectionConfiguration.UserName,
-                Password = connectionConfiguration.Password,
-                RequestedHeartbeat = connectionConfiguration.RequestedHeartbeat,
-                AutomaticRecoveryEnabled = true,
-                NetworkRecoveryInterval = connectionConfiguration.RetryDelay,
-                UseBackgroundThreadsForIO = true
-            };
-
-            connectionFactory.Ssl.ServerName = connectionConfiguration.Host;
-            connectionFactory.Ssl.CertPath = connectionConfiguration.CertPath;
-            connectionFactory.Ssl.CertPassphrase = connectionConfiguration.CertPassphrase;
-            connectionFactory.Ssl.Version = SslProtocols.Tls12;
-            connectionFactory.Ssl.Enabled = connectionConfiguration.UseTls;
-
-            connectionFactory.ClientProperties.Clear();
-
-            foreach (var item in connectionConfiguration.ClientProperties)
-            {
-                connectionFactory.ClientProperties.Add(item.Key, item.Value);
-            }
+            connectionFactory = (connectionName) => global::RabbitMqNext.ConnectionFactory.Connect(
+                connectionConfiguration.Host,
+                vhost: connectionConfiguration.VirtualHost,
+                username: connectionConfiguration.UserName,
+                password: connectionConfiguration.Password,
+                recoverySettings: new RabbitMqNext.AutoRecoverySettings { Enabled = true, RecoverBindings = true },
+                maxChannels: connectionConfiguration.MaxChannels,
+                connectionName: connectionName
+                );
         }
 
-        public IConnection CreatePublishConnection() => CreateConnection("Publish");
+        public Task<IConnection> CreatePublishConnection() => CreateConnection("Publish");
 
-        public IConnection CreateAdministrationConnection() => CreateConnection("Administration");
+        public Task<IConnection> CreateAdministrationConnection() => CreateConnection("Administration");
 
-        public IConnection CreateConnection(string connectionName)
+        public Task<IConnection> CreateConnection(string connectionName)
         {
-            lock (lockObject)
-            {
-                connectionFactory.ClientProperties["connected"] = DateTime.Now.ToString("G");
+            //connectionFactory.ClientProperties["connected"] = DateTime.Now.ToString("G");
 
-                return connectionFactory.CreateConnection(connectionName);
-            }
+            return connectionFactory(connectionName);
+
         }
     }
 }

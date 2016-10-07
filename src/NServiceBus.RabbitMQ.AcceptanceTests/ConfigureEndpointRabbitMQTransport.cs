@@ -11,7 +11,7 @@ using NServiceBus;
 using NServiceBus.AcceptanceTesting.Support;
 using NServiceBus.AcceptanceTests.ScenarioDescriptors;
 using NServiceBus.Transport.RabbitMQ.AcceptanceTests;
-using RabbitMQ.Client;
+using RabbitMqNext;
 
 class ConfigureScenariosForRabbitMQTransport : IConfigureSupportedScenariosForTestExecution
 {
@@ -21,6 +21,10 @@ class ConfigureScenariosForRabbitMQTransport : IConfigureSupportedScenariosForTe
 class ConfigureEndpointRabbitMQTransport : IConfigureEndpointTestExecution
 {
     string connectionString;
+    string username;
+    string password;
+    string host;
+    string virtualHost;
 
     public Task Configure(string endpointName, EndpointConfiguration configuration, RunSettings settings)
     {
@@ -38,14 +42,14 @@ class ConfigureEndpointRabbitMQTransport : IConfigureEndpointTestExecution
 
         var queues = await GetQueues(connectionFactory);
 
-        using (var connection = connectionFactory.CreateConnection())
-        using (var channel = connection.CreateModel())
+        using (var connection = await connectionFactory())
+        using (var channel = await connection.CreateChannel())
         {
             foreach (var queue in queues)
             {
                 try
                 {
-                    channel.QueuePurge(queue.Name);
+                    await channel.QueuePurge(queue.Name, true);
                 }
                 catch (Exception ex)
                 {
@@ -55,35 +59,30 @@ class ConfigureEndpointRabbitMQTransport : IConfigureEndpointTestExecution
         }
     }
 
-    ConnectionFactory CreateConnectionFactory()
+    Func<Task<IConnection>> CreateConnectionFactory()
     {
         var match = Regex.Match(connectionString, string.Format("[^\\w]*{0}=(?<{0}>[^;]+)", "host"), RegexOptions.IgnoreCase);
 
-        var username = match.Groups["UserName"].Success ? match.Groups["UserName"].Value : "guest";
-        var password = match.Groups["Password"].Success ? match.Groups["Password"].Value : "guest";
-        var host = match.Groups["host"].Success ? match.Groups["host"].Value : "localhost";
-        var virtualHost = match.Groups["VirtualHost"].Success ? match.Groups["VirtualHost"].Value : "/";
+        username = match.Groups["UserName"].Success ? match.Groups["UserName"].Value : "guest";
+        password = match.Groups["Password"].Success ? match.Groups["Password"].Value : "guest";
+        host = match.Groups["host"].Success ? match.Groups["host"].Value : "localhost";
+        virtualHost = match.Groups["VirtualHost"].Success ? match.Groups["VirtualHost"].Value : "/";
 
-        var connectionFactory = new ConnectionFactory
-        {
-            UserName = username,
-            Password = password,
-            VirtualHost = virtualHost,
-            HostName = host,
-            AutomaticRecoveryEnabled = true
-        };
-
-        connectionFactory.ClientProperties["purpose"] = "Test Queue Purger";
-
-        return connectionFactory;
+        return () => global::RabbitMqNext.ConnectionFactory.Connect(
+            host,
+            vhost: virtualHost,
+            username: username,
+            password: password,
+            recoverySettings: new RabbitMqNext.AutoRecoverySettings { Enabled = true, RecoverBindings = true }
+            );
     }
 
     // Requires that the RabbitMQ Management API has been enabled: https://www.rabbitmq.com/management.html
-    async Task<IEnumerable<Queue>> GetQueues(ConnectionFactory connectionFactory)
+    async Task<IEnumerable<Queue>> GetQueues(Func<Task<IConnection>> connectionFactory)
     {
-        var httpClient = CreateHttpClient(connectionFactory);
+        var httpClient = CreateHttpClient();
 
-        var queueResult = await httpClient.GetAsync(string.Format(CultureInfo.InvariantCulture, "api/queues/{0}", Uri.EscapeDataString(connectionFactory.VirtualHost)));
+        var queueResult = await httpClient.GetAsync(string.Format(CultureInfo.InvariantCulture, "api/queues/{0}", Uri.EscapeDataString(virtualHost)));
         queueResult.EnsureSuccessStatusCode();
 
         var content = await queueResult.Content.ReadAsStringAsync();
@@ -91,16 +90,16 @@ class ConfigureEndpointRabbitMQTransport : IConfigureEndpointTestExecution
         return JsonConvert.DeserializeObject<List<Queue>>(content);
     }
 
-    HttpClient CreateHttpClient(ConnectionFactory details)
+    HttpClient CreateHttpClient()
     {
         var handler = new HttpClientHandler
         {
-            Credentials = new NetworkCredential(details.UserName, details.Password)
+            Credentials = new NetworkCredential(username, password)
         };
 
         var httpClient = new HttpClient(handler)
         {
-            BaseAddress = new Uri(string.Format(CultureInfo.InvariantCulture, "http://{0}:15672/", details.HostName))
+            BaseAddress = new Uri(string.Format(CultureInfo.InvariantCulture, "http://{0}:15672/", host))
         };
 
         httpClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));

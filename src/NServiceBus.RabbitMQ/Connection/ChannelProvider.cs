@@ -1,14 +1,15 @@
 namespace NServiceBus.Transport.RabbitMQ
 {
+    using RabbitMqNext;
     using System;
     using System.Collections.Concurrent;
-    using global::RabbitMQ.Client;
+    using System.Threading.Tasks;
 
     class ChannelProvider : IChannelProvider, IDisposable
     {
         public ChannelProvider(ConnectionFactory connectionFactory, IRoutingTopology routingTopology, bool usePublisherConfirms)
         {
-            connection = new Lazy<IConnection>(() => connectionFactory.CreatePublishConnection());
+            connection = new Lazy<Task<IConnection>>(() => connectionFactory.CreatePublishConnection());
 
             this.routingTopology = routingTopology;
             this.usePublisherConfirms = usePublisherConfirms;
@@ -16,15 +17,14 @@ namespace NServiceBus.Transport.RabbitMQ
             channels = new ConcurrentQueue<ConfirmsAwareChannel>();
         }
 
-        public ConfirmsAwareChannel GetPublishChannel()
+        public async Task<ConfirmsAwareChannel> GetPublishChannel()
         {
             ConfirmsAwareChannel channel;
-
             if (!channels.TryDequeue(out channel) || channel.IsClosed)
             {
                 channel?.Dispose();
 
-                channel = new ConfirmsAwareChannel(connection.Value, routingTopology, usePublisherConfirms);
+                channel = new ConfirmsAwareChannel(await connection.Value.ConfigureAwait(false), routingTopology, usePublisherConfirms);
             }
 
             return channel;
@@ -32,7 +32,7 @@ namespace NServiceBus.Transport.RabbitMQ
 
         public void ReturnPublishChannel(ConfirmsAwareChannel channel)
         {
-            if (channel.IsOpen)
+            if (!channel.IsClosed)
             {
                 channels.Enqueue(channel);
             }
@@ -55,7 +55,7 @@ namespace NServiceBus.Transport.RabbitMQ
             }
         }
 
-        readonly Lazy<IConnection> connection;
+        readonly Lazy<Task<IConnection>> connection;
         readonly IRoutingTopology routingTopology;
         readonly bool usePublisherConfirms;
         readonly ConcurrentQueue<ConfirmsAwareChannel> channels;

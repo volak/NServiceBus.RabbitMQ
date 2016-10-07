@@ -5,10 +5,11 @@ using NServiceBus.Settings;
 using NServiceBus.TransportTests;
 using NServiceBus.Transport;
 using System.Text.RegularExpressions;
-using RabbitMQ.Client;
+using RabbitMqNext;
 
 class ConfigureRabbitMQTransportInfrastructure : IConfigureTransportInfrastructure
 {
+
     public TransportConfigurationResult Configure(SettingsHolder settings, TransportTransactionMode transactionMode)
     {
         var result = new TransportConfigurationResult();
@@ -32,40 +33,38 @@ class ConfigureRabbitMQTransportInfrastructure : IConfigureTransportInfrastructu
         return result;
     }
 
-    public Task Cleanup()
+    public async Task Cleanup()
     {
         if (transportTransactionMode >= requestedTransactionMode)
         {
-            PurgeQueues();
+            await PurgeQueues();
         }
-
-        return Task.FromResult(0);
     }
 
-    void PurgeQueues()
+    async Task PurgeQueues()
     {
         var connectionFactory = CreateConnectionFactory();
 
-        using (var connection = connectionFactory.CreateConnection("Test Queue Purger"))
-        using (var channel = connection.CreateModel())
+        using (var connection = await connectionFactory("Test Queue Purger"))
+        using (var channel = await connection.CreateChannel())
         {
             foreach (var queue in queueBindings.ReceivingAddresses)
             {
-                PurgeQueue(channel, queue);
+                await PurgeQueue(channel, queue);
             }
 
             foreach (var queue in queueBindings.SendingAddresses)
             {
-                PurgeQueue(channel, queue);
+                await PurgeQueue(channel, queue);
             }
         }
     }
 
-    static void PurgeQueue(IModel channel, string queue)
+    static async Task PurgeQueue(IChannel channel, string queue)
     {
         try
         {
-            channel.QueuePurge(queue);
+            await channel.QueuePurge(queue, true);
         }
         catch (Exception ex)
         {
@@ -73,29 +72,31 @@ class ConfigureRabbitMQTransportInfrastructure : IConfigureTransportInfrastructu
         }
     }
 
-    ConnectionFactory CreateConnectionFactory()
+
+    Func<String, Task<IConnection>> CreateConnectionFactory()
     {
         var match = Regex.Match(connectionString, string.Format("[^\\w]*{0}=(?<{0}>[^;]+)", "host"), RegexOptions.IgnoreCase);
 
-        var username = match.Groups["UserName"].Success ? match.Groups["UserName"].Value : "guest";
-        var password = match.Groups["Password"].Success ? match.Groups["Password"].Value : "guest";
-        var host = match.Groups["host"].Success ? match.Groups["host"].Value : "localhost";
-        var virtualHost = match.Groups["VirtualHost"].Success ? match.Groups["VirtualHost"].Value : "/";
+        username = match.Groups["UserName"].Success ? match.Groups["UserName"].Value : "guest";
+        password = match.Groups["Password"].Success ? match.Groups["Password"].Value : "guest";
+        host = match.Groups["host"].Success ? match.Groups["host"].Value : "localhost";
+        virtualHost = match.Groups["VirtualHost"].Success ? match.Groups["VirtualHost"].Value : "/";
 
-        var connectionFactory = new ConnectionFactory
-        {
-            UserName = username,
-            Password = password,
-            VirtualHost = virtualHost,
-            HostName = host,
-            AutomaticRecoveryEnabled = true,
-            UseBackgroundThreadsForIO = true
-        };
-
-        return connectionFactory;
+        return (name) => global::RabbitMqNext.ConnectionFactory.Connect(
+            host,
+            vhost: virtualHost,
+            username: username,
+            password: password,
+            recoverySettings: new RabbitMqNext.AutoRecoverySettings { Enabled = true, RecoverBindings = true },
+            connectionName: name
+            );
     }
 
     string connectionString;
+    string username;
+    string password;
+    string host;
+    string virtualHost;
     QueueBindings queueBindings;
     TransportTransactionMode transportTransactionMode;
     TransportTransactionMode requestedTransactionMode;

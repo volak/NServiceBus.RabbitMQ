@@ -5,8 +5,9 @@
     using System.Text;
     using System.Threading.Tasks;
     using Extensibility;
-    using global::RabbitMQ.Client.Events;
     using NUnit.Framework;
+    using RabbitMqNext;
+    using System.IO;
 
     [TestFixture]
     class When_sending_a_message_over_rabbitmq : RabbitMqContext
@@ -22,13 +23,13 @@
         [Test]
         public Task Should_set_the_content_type()
         {
-            return Verify(new OutgoingMessageBuilder().WithHeader(Headers.ContentType, "application/json"), received => Assert.AreEqual("application/json", received.BasicProperties.ContentType));
+            return Verify(new OutgoingMessageBuilder().WithHeader(Headers.ContentType, "application/json"), received => Assert.AreEqual("application/json", received.properties.ContentType));
         }
 
         [Test]
         public Task Should_default_the_content_type_to_octet_stream_when_no_content_type_is_specified()
         {
-            return Verify(new OutgoingMessageBuilder(), received => Assert.AreEqual("application/octet-stream", received.BasicProperties.ContentType));
+            return Verify(new OutgoingMessageBuilder(), received => Assert.AreEqual("application/octet-stream", received.properties.ContentType));
         }
 
         [Test]
@@ -36,7 +37,7 @@
         {
             var messageType = typeof(MyMessage);
 
-            return Verify(new OutgoingMessageBuilder().WithHeader(Headers.EnclosedMessageTypes, messageType.AssemblyQualifiedName), received => Assert.AreEqual(messageType.FullName, received.BasicProperties.Type));
+            return Verify(new OutgoingMessageBuilder().WithHeader(Headers.EnclosedMessageTypes, messageType.AssemblyQualifiedName), received => Assert.AreEqual(messageType.FullName, received.properties.Type));
         }
 
         [Test]
@@ -44,7 +45,7 @@
         {
             var timeToBeReceived = TimeSpan.FromDays(1);
 
-            return Verify(new OutgoingMessageBuilder().TimeToBeReceived(timeToBeReceived), received => Assert.AreEqual(timeToBeReceived.TotalMilliseconds.ToString(), received.BasicProperties.Expiration));
+            return Verify(new OutgoingMessageBuilder().TimeToBeReceived(timeToBeReceived), received => Assert.AreEqual(timeToBeReceived.TotalMilliseconds.ToString(), received.properties.Expiration));
         }
 
         [Test]
@@ -56,7 +57,7 @@
                 (t, r) =>
                 {
                     Assert.AreEqual(address, t.Headers[Headers.ReplyToAddress]);
-                    Assert.AreEqual(address, r.BasicProperties.ReplyTo);
+                    Assert.AreEqual(address, r.properties.ReplyTo);
                 });
         }
 
@@ -91,7 +92,7 @@
                 });
         }
 
-        async Task Verify(OutgoingMessageBuilder builder, Action<IncomingMessage, BasicDeliverEventArgs> assertion, string queueToReceiveOn = "testEndPoint")
+        async Task Verify(OutgoingMessageBuilder builder, Action<IncomingMessage, MessageDelivery> assertion, string queueToReceiveOn = "testEndPoint")
         {
             var operations = builder.SendTo(queueToReceiveOn).Build();
 
@@ -101,14 +102,16 @@
 
             var messageId = operations.MulticastTransportOperations.FirstOrDefault()?.Message.MessageId ?? operations.UnicastTransportOperations.FirstOrDefault()?.Message.MessageId;
 
-            var result = Consume(messageId, queueToReceiveOn);
+            var result = await Consume(messageId, queueToReceiveOn);
 
             var converter = new MessageConverter();
 
+            var body = new byte[result.bodySize];
+            await result.stream.ReadAsync(body, 0, result.bodySize);
             var incomingMessage = new IncomingMessage(
                 converter.RetrieveMessageId(result),
                 converter.RetrieveHeaders(result),
-                result.Body
+                body
             );
 
             assertion(incomingMessage, result);
@@ -116,28 +119,31 @@
 
         Task Verify(OutgoingMessageBuilder builder, Action<IncomingMessage> assertion, string queueToReceiveOn = "testEndPoint") => Verify(builder, (t, r) => assertion(t), queueToReceiveOn);
 
-        Task Verify(OutgoingMessageBuilder builder, Action<BasicDeliverEventArgs> assertion, string queueToReceiveOn = "testEndPoint") => Verify(builder, (t, r) => assertion(r), queueToReceiveOn);
+        Task Verify(OutgoingMessageBuilder builder, Action<MessageDelivery> assertion, string queueToReceiveOn = "testEndPoint") => Verify(builder, (t, r) => assertion(r), queueToReceiveOn);
 
-        BasicDeliverEventArgs Consume(string id, string queueToReceiveOn)
+        async Task<MessageDelivery> Consume(string id, string queueToReceiveOn)
         {
-            using (var connection = connectionFactory.CreateConnection("Consume"))
-            using (var channel = connection.CreateModel())
+            using (var connection = await connectionFactory.CreateConnection("Consume"))
+            using (var channel = await connection.CreateChannel())
             {
-                var message = channel.BasicGet(queueToReceiveOn, false);
+                // Doesnt support BasicGet like this
+                MessageDelivery message = null;// channel.BasicGet(queueToReceiveOn, false);
 
                 if (message == null)
                 {
                     throw new InvalidOperationException("No message found in queue");
                 }
 
-                if (message.BasicProperties.MessageId != id)
+                if (message.properties.MessageId != id)
                 {
                     throw new InvalidOperationException("Unexpected message found in queue");
                 }
 
-                channel.BasicAck(message.DeliveryTag, false);
+                channel.BasicAck(message.deliveryTag, false);
 
-                return new BasicDeliverEventArgs("", message.DeliveryTag, message.Redelivered, message.Exchange, message.RoutingKey, message.BasicProperties, message.Body);
+                var clone = new MemoryStream();
+                message.stream.CopyTo(clone);
+                return new MessageDelivery() { deliveryTag = message.deliveryTag, redelivered = message.redelivered, routingKey = message.routingKey, properties = message.properties, stream = clone };
             }
         }
 

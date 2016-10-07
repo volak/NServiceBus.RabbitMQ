@@ -10,9 +10,9 @@
     <AppDesignerFolder>Properties</AppDesignerFolder>
     <RootNamespace>NServiceBus.Transport.RabbitMQ</RootNamespace>
     <AssemblyName>NServiceBus.Transports.RabbitMQ</AssemblyName>
-    <TargetFrameworkVersion>v4.5.2</TargetFrameworkVersion>
+    <TargetFrameworkVersion>v4.6.1</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
-    <SignAssembly>true</SignAssembly>
+    <SignAssembly>false</SignAssembly>
     <AssemblyOriginatorKeyFile>..\..\NServiceBus.snk</AssemblyOriginatorKeyFile>
     <SolutionDir Condition="$(SolutionDir) == '' Or $(SolutionDir) == '*Undefined*'">..\</SolutionDir>
     <TargetFrameworkProfile />
@@ -55,6 +55,10 @@
       <Private>False</Private>
     </Reference>
     <Reference Include="Microsoft.CSharp" />
+    <Reference Include="Newtonsoft.Json, Version=8.0.0.0, Culture=neutral, PublicKeyToken=30ad4fe6b2a6aeed, processorArchitecture=MSIL">
+      <HintPath>..\packages\Newtonsoft.Json.8.0.3\lib\net45\Newtonsoft.Json.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
     <Reference Include="NServiceBus.Core, Version=6.0.0.0, Culture=neutral, PublicKeyToken=9fc386479f8a226c, processorArchitecture=MSIL">
       <HintPath>..\packages\NServiceBus.6.0.0\lib\net452\NServiceBus.Core.dll</HintPath>
       <Private>True</Private>
@@ -63,8 +67,8 @@
       <HintPath>..\packages\Obsolete.Fody.4.1.0\lib\dotnet\Obsolete.dll</HintPath>
       <Private>False</Private>
     </Reference>
-    <Reference Include="RabbitMQ.Client, Version=4.0.0.0, Culture=neutral, PublicKeyToken=89e7d7c5feba84ce, processorArchitecture=MSIL">
-      <HintPath>..\packages\RabbitMQ.Client.4.1.0\lib\net451\RabbitMQ.Client.dll</HintPath>
+    <Reference Include="RabbitMqNext, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>..\packages\RabbitMqNext.1.0.12\lib\net461\RabbitMqNext.dll</HintPath>
       <Private>True</Private>
     </Reference>
     <Reference Include="System" />
@@ -76,12 +80,11 @@
     <Compile Include="Connection\ChannelProvider.cs" />
     <Compile Include="Configuration\ObsoleteAppSettings.cs" />
     <Compile Include="Configuration\ConnectionStringParser.cs" />
+    <Compile Include="Connection\ConfirmsAwareChannel.cs" />
     <Compile Include="RabbitMQTransport.cs" />
     <Compile Include="Configuration\RabbitMQTransportSettingsExtensions.cs" />
     <Compile Include="RabbitMQTransportInfrastructure.cs" />
     <Compile Include="Configuration\SettingsKeys.cs" />
-    <Compile Include="Connection\ConfirmsAwareChannel.cs" />
-    <Compile Include="Receiving\ModelExtensions.cs" />
     <Compile Include="Routing\DefaultRoutingKeyConvention.cs" />
     <Compile Include="Configuration\ConnectionConfiguration.cs" />
     <Compile Include="Connection\ConnectionFactory.cs" />
