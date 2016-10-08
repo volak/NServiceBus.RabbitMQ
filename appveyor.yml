@@ -22,6 +22,9 @@ build:
   parallel: false
   project: src/NServiceBus.RabbitMQ.sln
   verbosity: minimal
+  publish_nuget: true             # package projects with .nuspec files and push to artifacts
+  publish_nuget_symbols: true     # generate and publish NuGet symbol packages
+  include_nuget_references: true  # add -IncludeReferencedProjects option while packaging NuGet artifacts
 
 deploy:
   - provider: NuGet
@@ -29,7 +32,7 @@ deploy:
       secure: nyYYvfNcljaFo6s6IBdC3lhqwAKOC9HfQjPguKXoHfgs22MwakH+IeXrM2Xn1uc0
     artifact: /.*\.nupkg/
     draft: false
-    prerelease: true
+    prerelease: false
     on:
       branch: master
 
@@ -39,10 +42,6 @@ matrix:
 artifacts:
   - path: '*.nupkg'
 
-after_build:
-  - ps: |
-      $ver = ${env:APPVEYOR_BUILD_VERSION}
-      nuget pack packaging/nuget/NServiceBus.RabbitMQNext.nuspec -version $ver -symbols
 
 test: off
 
