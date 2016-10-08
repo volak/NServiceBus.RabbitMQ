@@ -1,3 +1,5 @@
+[![Build status](https://ci.appveyor.com/api/projects/status/584304c3h9y5mb2c?svg=true)](https://ci.appveyor.com/project/volak/nservicebus-rabbitmq)
+
 # RabbitMqNext Transport for NServiceBus
 
 This is a fork of the official rabbitmq transport at [Particular/NServiceBus.RabbitMQ](https://github.com/Particular/NServiceBus.RabbitMQ) except this version uses the independent RabbitMq client [clearctvm/RabbitMqNext](https://github.com/clearctvm/RabbitMqNext)
