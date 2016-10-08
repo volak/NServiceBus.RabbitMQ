@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <package xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd">
   <metadata xmlns="http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd">
-    <id>NServiceBus.RabbitMQ</id>
-    <title>NServiceBus RabbitMQ</title>
+    <id>NServiceBus.RabbitMQNext</id>
+    <title>NServiceBus RabbitMQNext</title>
     <version>$version$</version>
     <authors>$authors$</authors>
     <owners>$owners$</owners>
@@ -10,7 +10,7 @@
     <projectUrl>$projectUrl$</projectUrl>
     <iconUrl>$iconUrl$</iconUrl>
     <requireLicenseAcceptance>$requireLicenseAcceptance$</requireLicenseAcceptance>
-    <description>RabbitMQ support for NServicebus</description>
+    <description>Fork of Particular's RabbitMq transport to use RabbitMqNext instead of official client - I am NOT affiliated with Particular</description>
     <releaseNotes></releaseNotes>
     <copyright>$copyright$</copyright>
     <tags>nservicebus servicebus msmq cqrs publish subscribe</tags>

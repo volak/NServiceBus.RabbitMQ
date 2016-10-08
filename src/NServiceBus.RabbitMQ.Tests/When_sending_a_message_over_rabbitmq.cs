@@ -123,7 +123,6 @@
 
         async Task<MessageDelivery> Consume(string id, string queueToReceiveOn)
         {
-            using (var connection = await connectionFactory.CreateConnection("Consume"))
             using (var channel = await connection.CreateChannel())
             {
                 // Doesnt support BasicGet like this
