@@ -69,13 +69,13 @@
             var connectionsTasks = new List<Task>();
             for (var i = 0; i < maxConcurrency; i++)
             {
-                connectionsTasks.Add(TaskEx.StartNew(null, async (_) =>
+                connectionsTasks.Add(TaskEx.StartNew(i, async (state) =>
                 {
                     var channel = await connection.CreateChannel().ConfigureAwait(false);
                     await channel.BasicQos(0, (ushort)Math.Min(prefetchMultiplier, ushort.MaxValue), false).ConfigureAwait(false);
 
                     var consumer = new MessageConsumer(channel, onMessage, onError, channelProvider, settings, messageConverter, circuitBreaker);
-                    await channel.BasicConsume(ConsumeMode.SerializedWithBufferCopy, consumer, settings.InputQueue, $"{consumerTag}.{i}", false, false, null, true).ConfigureAwait(false);
+                    await channel.BasicConsume(ConsumeMode.SerializedWithBufferCopy, consumer, settings.InputQueue, $"{consumerTag}.{(int)state}", false, false, null, true).ConfigureAwait(false);
 
                     channels.Add(channel);
                 }));
