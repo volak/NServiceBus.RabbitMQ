@@ -33,16 +33,11 @@
         [Test]
         public void TestCanHandleByteArrayHeader()
         {
+            var props = new BasicProperties { MessageId = "Blah" };
+            props.Headers["Foo"] = Encoding.UTF8.GetBytes("blah");
             var message = new MessageDelivery
             {
-                properties = new BasicProperties
-                {
-                    MessageId = "Blah",
-                    //Headers = new Dictionary<string, object>
-                    //{
-                    //    {"Foo", Encoding.UTF8.GetBytes("blah")}
-                    //}
-                }
+                properties = props
             };
 
             var headers = converter.RetrieveHeaders(message);
@@ -72,17 +67,15 @@
         [Test]
         public void Should_override_replyto_header_if_native_replyto_is_present()
         {
+            var props = new BasicProperties
+            {
+                ReplyTo = "myaddress",
+                MessageId = "Blah"
+            };
+            props.Headers[Headers.ReplyToAddress] = Encoding.UTF8.GetBytes("nsb set address");
             var message = new MessageDelivery
             {
-                properties = new BasicProperties
-                {
-                    ReplyTo = "myaddress",
-                    MessageId = "Blah",
-                    //Headers = new Dictionary<string, object>
-                    //{
-                    //    {Headers.ReplyToAddress, Encoding.UTF8.GetBytes("nsb set address")}
-                    //}
-                }
+                properties = props
             };
 
             var headers = converter.RetrieveHeaders(message);
@@ -120,10 +113,10 @@
                 properties = new BasicProperties
                 {
                     MessageId = "Blah",
-                //    Headers = new Dictionary<string, object>
-                //{
-                //    {"Foo", new ArrayList{"Bing"}}
-                //}
+                    //    Headers = new Dictionary<string, object>
+                    //{
+                    //    {"Foo", new ArrayList{"Bing"}}
+                    //}
                 }
             };
 
@@ -162,10 +155,10 @@
                 properties = new BasicProperties
                 {
                     MessageId = "Blah",
-                //    Headers = new Dictionary<string, object>
-                //{
-                //    {"Foo", new List<object>{new Dictionary<string, object>{{"key1", Encoding.UTF8.GetBytes("value1")}, {"key2", Encoding.UTF8.GetBytes("value2")}}}}
-                //}
+                    //    Headers = new Dictionary<string, object>
+                    //{
+                    //    {"Foo", new List<object>{new Dictionary<string, object>{{"key1", Encoding.UTF8.GetBytes("value1")}, {"key2", Encoding.UTF8.GetBytes("value2")}}}}
+                    //}
                 }
             };
 

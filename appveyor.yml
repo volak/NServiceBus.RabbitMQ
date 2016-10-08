@@ -1,0 +1,49 @@
+version: "1.0.0.{build}"
+
+platform: Any CPU
+configuration: Release
+
+skip_tags: true
+
+assembly_info:
+  patch: true
+  file: '**\AssemblyInfo.*'
+  assembly_version: '{version}'
+  assembly_file_version: '{version}'
+  assembly_informational_version: '{version}'
+
+init:
+  - echo %APPVEYOR_BUILD_VERSION%
+  
+
+before_build:
+  - nuget restore -DisableParallelProcessing
+  
+build:
+  parallel: false
+  project: src/NServiceBus.RabbitMQ.sln
+  verbosity: minimal
+
+deploy:
+  - provider: NuGet
+    api_key:
+      secure: nyYYvfNcljaFo6s6IBdC3lhqwAKOC9HfQjPguKXoHfgs22MwakH+IeXrM2Xn1uc0
+    artifact: /.*\.nupkg/
+    draft: false
+    prerelease: true
+    on:
+      branch: master
+
+matrix:
+  fast_finish: true
+
+artifacts:
+  - path: '*.nupkg'
+
+after_build:
+  - ps: |
+      $ver = ${env:APPVEYOR_BUILD_VERSION}
+      nuget pack RabbitMqNext.nuspec -version $ver -symbols
+
+test: off
+

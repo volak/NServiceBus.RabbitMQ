@@ -4,22 +4,18 @@
     <id>NServiceBus.RabbitMQNext</id>
     <title>NServiceBus RabbitMQNext</title>
     <version>$version$</version>
-    <authors>$authors$</authors>
-    <owners>$owners$</owners>
-    <licenseUrl>$licenseUrl$</licenseUrl>
-    <projectUrl>$projectUrl$</projectUrl>
-    <iconUrl>$iconUrl$</iconUrl>
-    <requireLicenseAcceptance>$requireLicenseAcceptance$</requireLicenseAcceptance>
+    <authors>Charles Solar</authors>
+    <owners>Charles Solar</owners>
+    <projectUrl>https://github.com/volak/NServiceBus.RabbitMQ</projectUrl>
     <description>Fork of Particular's RabbitMq transport to use RabbitMqNext instead of official client - I am NOT affiliated with Particular</description>
     <releaseNotes></releaseNotes>
-    <copyright>$copyright$</copyright>
-    <tags>nservicebus servicebus msmq cqrs publish subscribe</tags>
+    <tags>nservicebus servicebus cqrs publish subscribe rabbitmq rabbitmqnext</tags>
     <dependencies>
       <dependency id="NServiceBus" version="[6.0.0, 7.0.0)" />
       <dependency id="RabbitMQNext" version="[1.0.0, 1.1.0)" />
     </dependencies>
   </metadata>
   <files>
-    <file src="..\..\binaries\NServiceBus.Transports.RabbitMQ.???" target="lib\net452" />
+    <file src="..\..\binaries\NServiceBus.Transports.RabbitMQNext.???" target="lib\net452" />
   </files>
 </package>

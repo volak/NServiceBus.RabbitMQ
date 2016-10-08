@@ -9,7 +9,7 @@
     <OutputType>Library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
     <RootNamespace>NServiceBus.Transport.RabbitMQ</RootNamespace>
-    <AssemblyName>NServiceBus.Transports.RabbitMQ</AssemblyName>
+    <AssemblyName>NServiceBus.Transports.RabbitMQNext</AssemblyName>
     <TargetFrameworkVersion>v4.6.1</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <SignAssembly>false</SignAssembly>
@@ -28,7 +28,7 @@
     <DefineConstants>TRACE;DEBUG</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
-    <DocumentationFile>..\..\binaries\NServiceBus.Transports.RabbitMQ.xml</DocumentationFile>
+    <DocumentationFile>..\..\binaries\NServiceBus.Transports.RabbitMQNext.xml</DocumentationFile>
     <NoWarn>
     </NoWarn>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
@@ -42,7 +42,7 @@
     <DefineConstants>TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
-    <DocumentationFile>..\..\binaries\NServiceBus.Transports.RabbitMQ.xml</DocumentationFile>
+    <DocumentationFile>..\..\binaries\NServiceBus.Transports.RabbitMQNext.xml</DocumentationFile>
     <NoWarn>
     </NoWarn>
     <UseVSHostingProcess>false</UseVSHostingProcess>
