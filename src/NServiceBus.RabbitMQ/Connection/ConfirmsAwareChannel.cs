@@ -1,11 +1,11 @@
 namespace NServiceBus.Transport.RabbitMQ
 {
     using System;
-    using System.Collections.Concurrent;
     using System.Threading.Tasks;
     using Logging;
     using RabbitMqNext;
 
+    [Janitor.SkipWeaving]
     class ConfirmsAwareChannel : IDisposable
     {
         public ConfirmsAwareChannel(IConnection connection, IRoutingTopology routingTopology, bool usePublisherConfirms)
@@ -17,8 +17,6 @@ namespace NServiceBus.Transport.RabbitMQ
 
             
             this.routingTopology = routingTopology;
-            this.usePublisherConfirms = usePublisherConfirms;
-            
             
         }
 
@@ -45,12 +43,18 @@ namespace NServiceBus.Transport.RabbitMQ
         
         public void Dispose()
         {
+            if (!disposed)
+            {
+                channel.Close();
+                channel.Dispose();
+            }
+            disposed = true;
             //injected
         }
 
         IChannel channel;
         readonly IRoutingTopology routingTopology;
-        readonly bool usePublisherConfirms;
+        bool disposed;
 
         static readonly ILog Logger = LogManager.GetLogger(typeof(ConfirmsAwareChannel));
     }

@@ -14,7 +14,6 @@
         public static void Fill(this BasicProperties properties, OutgoingMessage message, List<DeliveryConstraint> deliveryConstraints)
         {
             properties.MessageId = message.MessageId;
-            properties.DeliveryMode = 0x2;
 
             if (message.Headers.ContainsKey(NServiceBus.Headers.CorrelationId))
             {
@@ -27,8 +26,16 @@
             {
                 properties.Expiration = timeToBeReceived.MaxTime.TotalMilliseconds.ToString(CultureInfo.InvariantCulture);
             }
-            // Todo: not supported?
-            //properties.Persistent = !deliveryConstraints.Any(c => c is NonDurableDelivery);
+
+            if(deliveryConstraints.Any(c => c is NonDurableDelivery))
+            {
+                properties.DeliveryMode = 0x1;
+            }
+            else
+            {
+                properties.DeliveryMode = 0x2;
+            }
+            
             foreach(var header in message.Headers)
                 properties.Headers[header.Key] = header.Value;
 

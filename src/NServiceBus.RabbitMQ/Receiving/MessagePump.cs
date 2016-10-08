@@ -21,7 +21,7 @@
         readonly TimeSpan timeToWaitBeforeTriggeringCircuitBreaker;
         readonly int prefetchMultiplier;
         readonly ushort overriddenPrefetchCount;
-        
+
 
         // Init
         Func<MessageContext, Task> onMessage;
@@ -32,7 +32,7 @@
         // Start
         int maxConcurrency;
         ConcurrentBag<IChannel> channels;
-        
+
 
         public MessagePump(IConnection connection, MessageConverter messageConverter, string consumerTag, IChannelProvider channelProvider, QueuePurger queuePurger, TimeSpan timeToWaitBeforeTriggeringCircuitBreaker, int prefetchMultiplier, ushort overriddenPrefetchCount)
         {
@@ -67,15 +67,15 @@
             maxConcurrency = limitations.MaxConcurrency;
 
             var connectionsTasks = new List<Task>();
-            for(var i = 0; i < maxConcurrency; i++)
+            for (var i = 0; i < maxConcurrency; i++)
             {
                 connectionsTasks.Add(TaskEx.StartNew(null, async (_) =>
-                {                    
+                {
                     var channel = await connection.CreateChannel().ConfigureAwait(false);
                     await channel.BasicQos(0, (ushort)Math.Min(prefetchMultiplier, ushort.MaxValue), false).ConfigureAwait(false);
 
                     var consumer = new MessageConsumer(channel, onMessage, onError, channelProvider, settings, messageConverter, circuitBreaker);
-                    await channel.BasicConsume(ConsumeMode.SerializedWithBufferCopy, consumer, settings.InputQueue, consumerTag, false, false, null, true).ConfigureAwait(false);
+                    await channel.BasicConsume(ConsumeMode.SerializedWithBufferCopy, consumer, settings.InputQueue, $"{consumerTag}.{i}", false, false, null, true).ConfigureAwait(false);
 
                     channels.Add(channel);
                 }));
@@ -84,25 +84,26 @@
             Task.WhenAll(connectionsTasks).Wait();
         }
 
-        public Task Stop()
+        public async Task Stop()
         {
-            IChannel chan;
             while (channels.Count > 0)
             {
+                IChannel chan;
                 if (!channels.TryTake(out chan))
                     continue;
 
-                if(!chan.IsClosed)
+                if (!chan.IsClosed)
+                {
+                    await chan.Close().ConfigureAwait(false);
                     chan.Dispose();
+                }
             }
 
             if (!connection.IsClosed)
                 connection.Dispose();
+        }
 
-            return Task.CompletedTask;
-        }        
-        
-        
+
 
         public void Dispose()
         {
