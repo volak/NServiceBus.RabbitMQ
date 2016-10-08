@@ -14,11 +14,7 @@ assembly_info:
 
 init:
   - echo %APPVEYOR_BUILD_VERSION%
-  
-
-before_build:
-  - nuget restore -DisableParallelProcessing
-  
+    
 build:
   parallel: false
   project: src/NServiceBus.RabbitMQ.sln
