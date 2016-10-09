@@ -49,7 +49,6 @@ namespace NServiceBus.Transport.RabbitMQ
                 channel.Dispose();
             }
             disposed = true;
-            //injected
         }
 
         IChannel channel;

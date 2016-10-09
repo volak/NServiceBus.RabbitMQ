@@ -28,7 +28,7 @@ namespace NServiceBus.Transport.RabbitMQ
                 vhost: connectionConfiguration.VirtualHost,
                 username: connectionConfiguration.UserName,
                 password: connectionConfiguration.Password,
-                //recoverySettings: AutoRecoverySettings.All,
+                recoverySettings: AutoRecoverySettings.All,
                 maxChannels: connectionConfiguration.MaxChannels,
                 connectionName: connectionName
             );

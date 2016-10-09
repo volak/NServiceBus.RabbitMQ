@@ -9,6 +9,7 @@
 
     class ConnectionConfiguration
     {
+
         public string Host { get; set; }
 
         public int Port { get; set; }
@@ -33,6 +34,8 @@
 
         public Dictionary<string, object> ClientProperties { get; } = new Dictionary<string, object>();
 
+        public bool publisherConfirms { get; set; }
+
         public ConnectionConfiguration(ReadOnlySettings settings)
         {
             // set default values
@@ -45,7 +48,11 @@
             UseTls = false;
             CertPath = "";
             CertPassphrase = null;
-            MaxChannels = 500;
+            MaxChannels = 150;
+
+            var usePublisherConfirms = true;
+            settings.TryGet(SettingsKeys.UsePublisherConfirms, out usePublisherConfirms);
+            publisherConfirms = usePublisherConfirms;
 
             SetDefaultClientProperties(settings);
         }

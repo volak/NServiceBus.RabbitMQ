@@ -14,7 +14,6 @@
         static readonly ILog Logger = LogManager.GetLogger(typeof(MessagePump));
 
         IConnection connection;
-        ConnectionFactory connectionFactory;
         readonly MessageConverter messageConverter;
         readonly string consumerTag;
         readonly IChannelProvider channelProvider;
@@ -35,9 +34,9 @@
         ConcurrentBag<IChannel> channels;
 
 
-        public MessagePump(ConnectionFactory connectionFactory, MessageConverter messageConverter, string consumerTag, IChannelProvider channelProvider, QueuePurger queuePurger, TimeSpan timeToWaitBeforeTriggeringCircuitBreaker, int prefetchMultiplier, ushort overriddenPrefetchCount)
+        public MessagePump(IConnection connection, MessageConverter messageConverter, string consumerTag, IChannelProvider channelProvider, QueuePurger queuePurger, TimeSpan timeToWaitBeforeTriggeringCircuitBreaker, int prefetchMultiplier, ushort overriddenPrefetchCount)
         {
-            this.connectionFactory = connectionFactory;
+            this.connection = connection;
             this.messageConverter = messageConverter;
             this.consumerTag = consumerTag;
             this.channelProvider = channelProvider;
@@ -67,7 +66,9 @@
         {
             maxConcurrency = limitations.MaxConcurrency;
 
-            connection = connectionFactory.CreateConnection($"{settings.InputQueue} MessagePump").Result;
+            // Todo: MaxConcurrency
+            // I could use MaxConcurrency to specify the number of channels like here
+            // or I would use it to specify how many connections aka threads should exist
             var connectionsTasks = new List<Task>();
             for (var i = 0; i < maxConcurrency; i++)
             {

@@ -14,7 +14,7 @@ namespace NServiceBus.Transport.RabbitMQ
 
         public async Task Purge(string queue)
         {
-            var connection = await connectionFactory.CreateAdministrationConnection().ConfigureAwait(false);
+            using(var connection = await connectionFactory.CreateAdministrationConnection().ConfigureAwait(false))
             using (var channel = await connection.CreateChannel().ConfigureAwait(false))
             {
                 await channel.QueuePurge(queue, true).ConfigureAwait(false);

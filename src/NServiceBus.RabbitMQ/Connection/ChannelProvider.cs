@@ -45,8 +45,7 @@ namespace NServiceBus.Transport.RabbitMQ
         {
             //injected
         }
-
-
+        
         readonly Lazy<IConnection> connection;
         readonly IRoutingTopology routingTopology;
         readonly bool usePublisherConfirms;

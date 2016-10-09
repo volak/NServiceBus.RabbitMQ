@@ -16,32 +16,37 @@
     {
         readonly static ILog Logger = LogManager.GetLogger("RabbitMqTransport");
         readonly SettingsHolder settings;
-        readonly ChannelProvider channelProvider;
         IRoutingTopology routingTopology;
         ConnectionFactory connectionFactory;
+        ChannelProvider channelProvider;
+        IConnection receiveConnection;
 
         public RabbitMQTransportInfrastructure(SettingsHolder settings, string connectionString)
         {
             RabbitMqNext.LogAdapter.LogDebugFn = (@class, message, ex) => Logger.Debug($"{@class} {message}", ex);
-            RabbitMqNext.LogAdapter.LogWarnFn= (@class, message, ex) => Logger.Warn($"{@class} {message}", ex);
+            RabbitMqNext.LogAdapter.LogWarnFn = (@class, message, ex) => Logger.Warn($"{@class} {message}", ex);
             RabbitMqNext.LogAdapter.LogErrorFn = (@class, message, ex) => Logger.Error($"{@class} {message}", ex);
-            LogAdapter.ProtocolLevelLogEnabled = true;
 
             this.settings = settings;
             var connectionConfiguration = new ConnectionStringParser(settings).Parse(connectionString);
-            connectionFactory = new ConnectionFactory(connectionConfiguration);
 
             CreateTopology();
 
-            bool usePublisherConfirms;
-            if (!settings.TryGet(SettingsKeys.UsePublisherConfirms, out usePublisherConfirms))
-            {
-                usePublisherConfirms = true;
-            }
-
-            channelProvider = new ChannelProvider(connectionFactory, routingTopology, usePublisherConfirms);
+            connectionFactory = new ConnectionFactory(connectionConfiguration);
+            channelProvider = new ChannelProvider(connectionFactory, routingTopology, connectionConfiguration.publisherConfirms);
 
             RequireOutboxConsent = false;
+        }
+
+        public override async Task Start()
+        {
+            receiveConnection = await connectionFactory.CreateConnection($"{settings.EndpointName()} - {settings.LocalAddress()}").ConfigureAwait(false);
+        }
+
+        public override Task Stop()
+        {
+            receiveConnection.Dispose();
+            return Task.CompletedTask;
         }
 
         public override IEnumerable<Type> DeliveryConstraints => new[] { typeof(DiscardIfNotReceivedBefore), typeof(NonDurableDelivery) };
@@ -158,7 +163,7 @@
                 prefetchCount = 0;
             }
 
-            return new MessagePump(connectionFactory, messageConverter, consumerTag, channelProvider, queuePurger, timeToWaitBeforeTriggeringCircuitBreaker, prefetchMultiplier, prefetchCount);
+            return new MessagePump(receiveConnection, messageConverter, consumerTag, channelProvider, queuePurger, timeToWaitBeforeTriggeringCircuitBreaker, prefetchMultiplier, prefetchCount);
         }
     }
 }

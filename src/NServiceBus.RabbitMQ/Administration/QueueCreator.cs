@@ -1,5 +1,6 @@
 ﻿namespace NServiceBus.Transport.RabbitMQ
 {
+    using System;
     using RabbitMqNext;
     using System.Threading.Tasks;
 
@@ -32,7 +33,7 @@
 
         async Task CreateQueueIfNecessary(string receivingAddress)
         {
-            var connection = await connectionFactory.CreateAdministrationConnection().ConfigureAwait(false);
+            using(var connection = await connectionFactory.CreateAdministrationConnection().ConfigureAwait(false))
             using (var channel = await connection.CreateChannel().ConfigureAwait(false))
             {
                 await channel.QueueDeclare(receivingAddress, false, durableMessagesEnabled, false, false, null, true).ConfigureAwait(false);
