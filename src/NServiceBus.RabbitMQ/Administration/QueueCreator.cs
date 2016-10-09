@@ -33,14 +33,16 @@
 
         async Task CreateQueueIfNecessary(string receivingAddress)
         {
-            using(var connection = await connectionFactory.CreateAdministrationConnection().ConfigureAwait(false))
-            using (var channel = await connection.CreateChannel().ConfigureAwait(false))
+            using (var connection = await connectionFactory.CreateAdministrationConnection().ConfigureAwait(false))
             {
-                await channel.QueueDeclare(receivingAddress, false, durableMessagesEnabled, false, false, null, true).ConfigureAwait(false);
+                using (var channel = await connection.CreateChannel().ConfigureAwait(false))
+                {
+                    await channel.QueueDeclare(receivingAddress, false, durableMessagesEnabled, false, false, null, true).ConfigureAwait(false);
 
-                await routingTopology.Initialize(channel, receivingAddress).ConfigureAwait(false);
+                    await routingTopology.Initialize(channel, receivingAddress).ConfigureAwait(false);
 
-                await channel.Close().ConfigureAwait(false);
+                    await channel.Close().ConfigureAwait(false);
+                }
             }
         }
     }

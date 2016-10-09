@@ -32,7 +32,7 @@
 
             CreateTopology();
 
-            connectionFactory = new ConnectionFactory(connectionConfiguration);
+            connectionFactory = new ConnectionFactory(settings, connectionConfiguration);
             channelProvider = new ChannelProvider(connectionFactory, routingTopology, connectionConfiguration.publisherConfirms);
 
             RequireOutboxConsent = false;
@@ -40,7 +40,7 @@
 
         public override async Task Start()
         {
-            receiveConnection = await connectionFactory.CreateConnection($"{settings.EndpointName()} - {settings.LocalAddress()}").ConfigureAwait(false);
+            receiveConnection = await connectionFactory.CreateConnection("Receive").ConfigureAwait(false);
         }
 
         public override Task Stop()

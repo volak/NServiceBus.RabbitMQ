@@ -21,21 +21,25 @@
         public async Task Subscribe(Type eventType, ContextBag context)
         {
             using (var connection = await connectionFactory.CreateAdministrationConnection().ConfigureAwait(false))
-            using (var channel = await connection.CreateChannel().ConfigureAwait(false))
             {
-                await routingTopology.SetupSubscription(channel, eventType, localQueue).ConfigureAwait(false);
+                using (var channel = await connection.CreateChannel().ConfigureAwait(false))
+                {
+                    await routingTopology.SetupSubscription(channel, eventType, localQueue).ConfigureAwait(false);
+                }
             }
-            
+
         }
 
         public async Task Unsubscribe(Type eventType, ContextBag context)
         {
             using (var connection = await connectionFactory.CreateAdministrationConnection().ConfigureAwait(false))
-            using (var channel = await connection.CreateChannel().ConfigureAwait(false))
             {
-                await routingTopology.TeardownSubscription(channel, eventType, localQueue).ConfigureAwait(false);
+                using (var channel = await connection.CreateChannel().ConfigureAwait(false))
+                {
+                    await routingTopology.TeardownSubscription(channel, eventType, localQueue).ConfigureAwait(false);
+                }
             }
-            
+
         }
     }
 }

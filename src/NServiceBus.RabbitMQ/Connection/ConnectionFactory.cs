@@ -6,14 +6,20 @@ namespace NServiceBus.Transport.RabbitMQ
     using System.Linq;
     using System.Threading.Tasks;
     using global::RabbitMqNext;
+    using Settings;
 
     [Janitor.SkipWeaving]
-    class ConnectionFactory 
+    class ConnectionFactory
     {
         readonly Func<String, Task<IConnection>> connectionFactory;
+        readonly ReadOnlySettings settings;
 
-        public ConnectionFactory(ConnectionConfiguration connectionConfiguration)
+        public ConnectionFactory(ReadOnlySettings settings, ConnectionConfiguration connectionConfiguration)
         {
+            if (settings == null)
+            {
+                throw new ArgumentException(nameof(settings));
+            }
             if (connectionConfiguration == null)
             {
                 throw new ArgumentNullException(nameof(connectionConfiguration));
@@ -23,7 +29,8 @@ namespace NServiceBus.Transport.RabbitMQ
             {
                 throw new ArgumentException("The connectionConfiguration has a null Host.", nameof(connectionConfiguration));
             }
-            connectionFactory = (connectionName) => RabbitMqNext.ConnectionFactory.Connect(
+            this.settings = settings;
+            this.connectionFactory = (connectionName) => RabbitMqNext.ConnectionFactory.Connect(
                 connectionConfiguration.Host,
                 vhost: connectionConfiguration.VirtualHost,
                 username: connectionConfiguration.UserName,
@@ -31,7 +38,7 @@ namespace NServiceBus.Transport.RabbitMQ
                 recoverySettings: AutoRecoverySettings.All,
                 maxChannels: connectionConfiguration.MaxChannels,
                 connectionName: connectionName
-            );
+        );
 
         }
 
@@ -44,9 +51,9 @@ namespace NServiceBus.Transport.RabbitMQ
         {
             //connectionFactory.ClientProperties["connected"] = DateTime.Now.ToString("G");
 
-            return connectionFactory(connectionName);
+            return connectionFactory($"{settings.InstanceSpecificQueue()} - {connectionName}");
 
         }
-        
+
     }
 }

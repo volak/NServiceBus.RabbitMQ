@@ -67,7 +67,7 @@
                 config = new ConnectionConfiguration(settings);
                 config.Host = "localhost";
             }
-            connectionFactory = new RabbitMQ.ConnectionFactory(config);
+            connectionFactory = new RabbitMQ.ConnectionFactory(settings, config);
             channelProvider = new ChannelProvider(connectionFactory, routingTopology, true);
 
             messageDispatcher = new MessageDispatcher(channelProvider);
