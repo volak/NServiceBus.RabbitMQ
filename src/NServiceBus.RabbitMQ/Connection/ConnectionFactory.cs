@@ -36,7 +36,7 @@ namespace NServiceBus.Transport.RabbitMQ
                 username: connectionConfiguration.UserName,
                 password: connectionConfiguration.Password,
                 recoverySettings: AutoRecoverySettings.All,
-                maxChannels: connectionConfiguration.MaxChannels,
+                //maxChannels: connectionConfiguration.MaxChannels,
                 connectionName: connectionName
         );
 
