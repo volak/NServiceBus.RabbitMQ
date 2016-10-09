@@ -7,19 +7,20 @@
 
     class SubscriptionManager : IManageSubscriptions
     {
-        readonly IConnection connection;
+        readonly ConnectionFactory connectionFactory;
         readonly IRoutingTopology routingTopology;
         readonly string localQueue;
 
-        public SubscriptionManager(IConnection connection, IRoutingTopology routingTopology, string localQueue)
+        public SubscriptionManager(ConnectionFactory connectionFactory, IRoutingTopology routingTopology, string localQueue)
         {
-            this.connection = connection;
+            this.connectionFactory = connectionFactory;
             this.routingTopology = routingTopology;
             this.localQueue = localQueue;
         }
 
         public async Task Subscribe(Type eventType, ContextBag context)
         {
+            var connection = await connectionFactory.CreateAdministrationConnection().ConfigureAwait(false);
             using (var channel = await connection.CreateChannel().ConfigureAwait(false))
             {
                 await routingTopology.SetupSubscription(channel, eventType, localQueue).ConfigureAwait(false);
@@ -29,6 +30,7 @@
 
         public async Task Unsubscribe(Type eventType, ContextBag context)
         {
+            var connection = await connectionFactory.CreateAdministrationConnection().ConfigureAwait(false);
             using (var channel = await connection.CreateChannel().ConfigureAwait(false))
             {
                 await routingTopology.TeardownSubscription(channel, eventType, localQueue).ConfigureAwait(false);

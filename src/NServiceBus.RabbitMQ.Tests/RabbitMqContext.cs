@@ -10,22 +10,24 @@
 
     class RabbitMqContext
     {
-        protected async void MakeSureQueueAndExchangeExists(string queueName)
+        protected async Task MakeSureQueueAndExchangeExists(string queueName)
         {
+            var connection = await connectionFactory.CreateAdministrationConnection();
             using (var channel = await connection.CreateChannel())
             {
                 await channel.QueueDeclare(queueName, true, false, false, false, null, true);
                 await channel.QueuePurge(queueName, true);
 
                 //to make sure we kill old subscriptions
-                DeleteExchange(queueName);
+                await DeleteExchange(queueName);
 
                 await routingTopology.Initialize(channel, queueName);
             }
         }
 
-        async void DeleteExchange(string exchangeName)
+        async Task DeleteExchange(string exchangeName)
         {
+            var connection = await connectionFactory.CreateAdministrationConnection();
             using (var channel = await connection.CreateChannel())
             {
                 try
@@ -65,19 +67,18 @@
                 config = new ConnectionConfiguration(settings);
                 config.Host = "localhost";
             }
-
-            connection = await global::RabbitMqNext.ConnectionFactory.Connect(config.Host, config.VirtualHost, config.UserName, config.Password);
-            channelProvider = new ChannelProvider(connection, routingTopology, true);
+            connectionFactory = new RabbitMQ.ConnectionFactory(config);
+            channelProvider = new ChannelProvider(connectionFactory, routingTopology, true);
 
             messageDispatcher = new MessageDispatcher(channelProvider);
 
-            var purger = new QueuePurger(connection);
+            var purger = new QueuePurger(connectionFactory);
 
-            messagePump = new MessagePump(connection, new MessageConverter(), "Unit test", channelProvider, purger, TimeSpan.FromMinutes(2), 3, 0);
+            messagePump = new MessagePump(connectionFactory, new MessageConverter(), "Unit test", channelProvider, purger, TimeSpan.FromMinutes(2), 3, 0);
 
-            MakeSureQueueAndExchangeExists(ReceiverQueue);
+            await MakeSureQueueAndExchangeExists(ReceiverQueue);
 
-            subscriptionManager = new SubscriptionManager(connection, routingTopology, ReceiverQueue);
+            subscriptionManager = new SubscriptionManager(connectionFactory, routingTopology, ReceiverQueue);
 
             messagePump.Init(messageContext =>
             {
@@ -117,7 +118,7 @@
 
         protected const string ReceiverQueue = "testreceiver";
         protected MessageDispatcher messageDispatcher;
-        protected IConnection connection;
+        protected RabbitMQ.ConnectionFactory connectionFactory;
         private ChannelProvider channelProvider;
         protected MessagePump messagePump;
         BlockingCollection<IncomingMessage> receivedMessages;

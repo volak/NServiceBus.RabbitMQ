@@ -27,7 +27,8 @@
         public async Task Should_be_able_to_receive_messages_without_headers()
         {
             var message = new OutgoingMessage(Guid.NewGuid().ToString(), new Dictionary<string, string>(), new byte[0]);
-            
+
+            var connection = await connectionFactory.CreateAdministrationConnection().ConfigureAwait(false);
             using (var channel = await connection.CreateChannel())
             {
                 var properties = channel.RentBasicProperties();
@@ -46,7 +47,8 @@
         public async Task Should_be_able_to_receive_a_blank_message()
         {
             var message = new OutgoingMessage(Guid.NewGuid().ToString(), new Dictionary<string, string>(), new byte[0]);
-            
+
+            var connection = await connectionFactory.CreateAdministrationConnection().ConfigureAwait(false);
             using (var channel = await connection.CreateChannel())
             {
                 var properties = channel.RentBasicProperties();
@@ -67,7 +69,8 @@
             var message = new OutgoingMessage(Guid.NewGuid().ToString(), new Dictionary<string, string>(), new byte[0]);
 
             var typeName = typeof(MyMessage).FullName;
-            
+
+            var connection = await connectionFactory.CreateAdministrationConnection().ConfigureAwait(false);
             using (var channel = await connection.CreateChannel())
             {
                 var properties = channel.RentBasicProperties();

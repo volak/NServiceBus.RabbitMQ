@@ -2,11 +2,13 @@
 namespace NServiceBus.Transport.RabbitMQ
 {
     using System;
-    using System.Security.Authentication;
+    using System.Collections.Generic;
+    using System.Linq;
     using System.Threading.Tasks;
     using global::RabbitMqNext;
 
-    class ConnectionFactory
+    [Janitor.SkipWeaving]
+    class ConnectionFactory 
     {
         readonly Func<String, Task<IConnection>> connectionFactory;
 
@@ -21,17 +23,18 @@ namespace NServiceBus.Transport.RabbitMQ
             {
                 throw new ArgumentException("The connectionConfiguration has a null Host.", nameof(connectionConfiguration));
             }
-
-            connectionFactory = (connectionName) => global::RabbitMqNext.ConnectionFactory.Connect(
+            connectionFactory = (connectionName) => RabbitMqNext.ConnectionFactory.Connect(
                 connectionConfiguration.Host,
                 vhost: connectionConfiguration.VirtualHost,
                 username: connectionConfiguration.UserName,
                 password: connectionConfiguration.Password,
-                recoverySettings: new RabbitMqNext.AutoRecoverySettings { Enabled = true, RecoverBindings = true },
+                //recoverySettings: AutoRecoverySettings.All,
                 maxChannels: connectionConfiguration.MaxChannels,
                 connectionName: connectionName
-                );
+            );
+
         }
+
 
         public Task<IConnection> CreatePublishConnection() => CreateConnection("Publish");
 
@@ -44,5 +47,6 @@ namespace NServiceBus.Transport.RabbitMQ
             return connectionFactory(connectionName);
 
         }
+        
     }
 }

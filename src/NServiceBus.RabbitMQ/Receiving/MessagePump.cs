@@ -14,6 +14,7 @@
         static readonly ILog Logger = LogManager.GetLogger(typeof(MessagePump));
 
         IConnection connection;
+        ConnectionFactory connectionFactory;
         readonly MessageConverter messageConverter;
         readonly string consumerTag;
         readonly IChannelProvider channelProvider;
@@ -34,9 +35,9 @@
         ConcurrentBag<IChannel> channels;
 
 
-        public MessagePump(IConnection connection, MessageConverter messageConverter, string consumerTag, IChannelProvider channelProvider, QueuePurger queuePurger, TimeSpan timeToWaitBeforeTriggeringCircuitBreaker, int prefetchMultiplier, ushort overriddenPrefetchCount)
+        public MessagePump(ConnectionFactory connectionFactory, MessageConverter messageConverter, string consumerTag, IChannelProvider channelProvider, QueuePurger queuePurger, TimeSpan timeToWaitBeforeTriggeringCircuitBreaker, int prefetchMultiplier, ushort overriddenPrefetchCount)
         {
-            this.connection = connection;
+            this.connectionFactory = connectionFactory;
             this.messageConverter = messageConverter;
             this.consumerTag = consumerTag;
             this.channelProvider = channelProvider;
@@ -66,6 +67,7 @@
         {
             maxConcurrency = limitations.MaxConcurrency;
 
+            connection = connectionFactory.CreateConnection($"{settings.InputQueue} MessagePump").Result;
             var connectionsTasks = new List<Task>();
             for (var i = 0; i < maxConcurrency; i++)
             {
@@ -98,7 +100,7 @@
                     chan.Dispose();
                 }
             }
-
+            
             if (!connection.IsClosed)
                 connection.Dispose();
         }
