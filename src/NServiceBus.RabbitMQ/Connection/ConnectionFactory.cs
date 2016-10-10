@@ -7,8 +7,7 @@ namespace NServiceBus.Transport.RabbitMQ
     using System.Threading.Tasks;
     using global::RabbitMqNext;
     using Settings;
-
-    [Janitor.SkipWeaving]
+    
     class ConnectionFactory
     {
         readonly Func<String, Task<IConnection>> connectionFactory;

@@ -38,14 +38,14 @@
             }
 
             await SetupTypeSubscriptions(channel, type).ConfigureAwait(false);
-            await channel.ExchangeBind(subscriberName, ExchangeName(type), string.Empty, null, true).ConfigureAwait(false);
+            await channel.ExchangeBind(ExchangeName(type), subscriberName, string.Empty, null, true).ConfigureAwait(false);
         }
 
         public async Task TeardownSubscription(IChannel channel, Type type, string subscriberName)
         {
             try
             {
-                await channel.ExchangeUnbind(subscriberName, ExchangeName(type), string.Empty, null, true).ConfigureAwait(false);
+                await channel.ExchangeUnbind(ExchangeName(type), subscriberName, string.Empty, null, true).ConfigureAwait(false);
             }
             // ReSharper disable EmptyGeneralCatchClause
             catch (Exception)
@@ -102,17 +102,19 @@
             while (baseType != null)
             {
                 await CreateExchange(channel, ExchangeName(baseType)).ConfigureAwait(false);
-                await channel.ExchangeBind(ExchangeName(baseType), ExchangeName(typeToProcess), string.Empty, null, true).ConfigureAwait(false);
+                await channel.ExchangeBind(ExchangeName(typeToProcess), ExchangeName(baseType), string.Empty, null, true).ConfigureAwait(false);
                 typeToProcess = baseType;
                 baseType = typeToProcess.BaseType;
             }
-
-            foreach (var interfaceType in type.GetInterfaces())
+            if (type.IsInterface)
             {
-                var exchangeName = ExchangeName(interfaceType);
+                foreach (var interfaceType in type.GetInterfaces())
+                {
+                    var exchangeName = ExchangeName(interfaceType);
 
-                await CreateExchange(channel, exchangeName).ConfigureAwait(false);
-                await channel.ExchangeBind(exchangeName, ExchangeName(type), string.Empty, null, true).ConfigureAwait(false);
+                    await CreateExchange(channel, exchangeName).ConfigureAwait(false);
+                    await channel.ExchangeBind(ExchangeName(type), exchangeName, string.Empty, null, true).ConfigureAwait(false);
+                }
             }
 
             MarkTypeConfigured(type);

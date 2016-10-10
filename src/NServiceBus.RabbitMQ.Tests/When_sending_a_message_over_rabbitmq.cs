@@ -101,7 +101,7 @@
             await messageDispatcher.Dispatch(operations, new TransportTransaction(), new ContextBag());
 
             var messageId = operations.MulticastTransportOperations.FirstOrDefault()?.Message.MessageId ?? operations.UnicastTransportOperations.FirstOrDefault()?.Message.MessageId;
-
+            
             var result = await Consume(messageId, queueToReceiveOn);
 
             var converter = new MessageConverter();
@@ -123,11 +123,17 @@
 
         async Task<MessageDelivery> Consume(string id, string queueToReceiveOn)
         {
-            var connection = await connectionFactory.CreateAdministrationConnection().ConfigureAwait(false);
-            using (var channel = await connection.CreateChannel())
+            using (var channel = await receiveConnection.CreateChannelWithPublishConfirmation())
             {
-                // Doesnt support BasicGet like this
-                MessageDelivery message = null;// channel.BasicGet(queueToReceiveOn, false);
+                var tcs = new TaskCompletionSource<MessageDelivery>();
+
+                await channel.BasicConsume(ConsumeMode.SerializedWithBufferCopy, (msg) =>
+                {
+                    tcs.SetResult(msg);
+                    return Task.CompletedTask;
+                }, queueToReceiveOn, "test", false, false, null, true).ConfigureAwait(false);
+
+                var message = await tcs.Task.ConfigureAwait(false);
 
                 if (message == null)
                 {
@@ -140,13 +146,11 @@
                 }
 
                 channel.BasicAck(message.deliveryTag, false);
-
-                var clone = new MemoryStream();
-                message.stream.CopyTo(clone);
-                return new MessageDelivery() { deliveryTag = message.deliveryTag, redelivered = message.redelivered, routingKey = message.routingKey, properties = message.properties, stream = clone };
+                
+                return message.SafeClone();
             }
         }
-
+        
         class MyMessage
         {
 

@@ -47,7 +47,7 @@
         {
             var message = transportOperation.Message;
             
-            var properties = channel.CreateBasicProperties();
+            var properties = channel.RentBasicProperties();
             properties.Fill(message, transportOperation.DeliveryConstraints);
 
             return channel.SendMessage(transportOperation.Destination, message, properties);
@@ -57,7 +57,7 @@
         {
             var message = transportOperation.Message;
 
-            var properties = channel.CreateBasicProperties();
+            var properties = channel.RentBasicProperties();
             properties.Fill(message, transportOperation.DeliveryConstraints);
 
             return channel.PublishMessage(transportOperation.MessageType, message, properties);

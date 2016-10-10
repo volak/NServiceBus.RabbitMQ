@@ -10,14 +10,14 @@ using System.Threading.Tasks;
 
 namespace NServiceBus.Transport.RabbitMQ
 {
-    class MessageConsumer : IQueueConsumer, IDisposable
+    class MessageConsumer : IQueueConsumer
     {
         private static readonly ILog Logger = LogManager.GetLogger(typeof(MessageConsumer));
         static readonly ContextBag contextBag = new ContextBag();
         static readonly TransportTransaction transportTranaction = new TransportTransaction();
 
-        private IChannel _channel;
-        private IChannelProvider _channelProvider;
+        private readonly IChannel _channel;
+        private readonly IChannelProvider _channelProvider;
         private MessagePumpConnectionFailedCircuitBreaker _circutBreaker;
         private readonly MessageConverter _converter;
         private readonly Func<MessageContext, Task> _onMessage;
@@ -109,8 +109,7 @@ namespace NServiceBus.Transport.RabbitMQ
                 }
                 if (processed && tokenSource.IsCancellationRequested)
                 {
-                    throw new NotImplementedException("Currently the library does not support rejecting messages");
-                    //await consumer.Model.BasicRejectAndRequeueIfOpen(message.DeliveryTag).ConfigureAwait(false);
+                    _channel.BasicNAck(delivery.deliveryTag, false, true);
                 }
                 else
                 {
@@ -147,10 +146,8 @@ namespace NServiceBus.Transport.RabbitMQ
             {
                 Logger.Error($"Failed to move poison message{(messageId == null ? "" : $" '{messageId}'")} to queue '{queue}'. Returning message to original queue...", ex);
 
-                throw new NotImplementedException("Currently the library does not support rejecting messages");
-                //await consumer.Model.BasicRejectAndRequeueIfOpen(message.DeliveryTag).ConfigureAwait(false);
-
-                //return;
+                _channel.BasicNAck(delivery.deliveryTag, false, true);
+                return;
             }
 
             try
@@ -162,11 +159,6 @@ namespace NServiceBus.Transport.RabbitMQ
                 Logger.Warn($"Failed to acknowledge poison message{(messageId == null ? "" : $" '{messageId}'")} because the channel was closed. The message was sent to queue '{queue}' but also returned to the original queue.", ex);
             }
         }
-
-
-        public void Dispose()
-        {
-            // injected
-        }
+        
     }
 }

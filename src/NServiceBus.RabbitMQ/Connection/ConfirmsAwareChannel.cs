@@ -20,7 +20,7 @@ namespace NServiceBus.Transport.RabbitMQ
             
         }
 
-        public BasicProperties CreateBasicProperties() => channel.RentBasicProperties();
+        public BasicProperties RentBasicProperties() => channel.RentBasicProperties();
 
         public bool IsOpen => !channel.IsClosed;
 

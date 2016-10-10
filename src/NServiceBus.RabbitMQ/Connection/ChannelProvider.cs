@@ -40,6 +40,7 @@ namespace NServiceBus.Transport.RabbitMQ
                 channel.Dispose();
             }
         }
+        
 
         public void Dispose()
         {

@@ -43,7 +43,7 @@ class ConfigureEndpointRabbitMQTransport : IConfigureEndpointTestExecution
         var queues = await GetQueues(connectionFactory);
 
         using (var connection = await connectionFactory())
-        using (var channel = await connection.CreateChannel())
+        using (var channel = await connection.CreateChannelWithPublishConfirmation())
         {
             foreach (var queue in queues)
             {
@@ -72,8 +72,7 @@ class ConfigureEndpointRabbitMQTransport : IConfigureEndpointTestExecution
             host,
             vhost: virtualHost,
             username: username,
-            password: password,
-            recoverySettings: new RabbitMqNext.AutoRecoverySettings { Enabled = true, RecoverBindings = true }
+            password: password
             );
     }
 

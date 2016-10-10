@@ -12,14 +12,11 @@
     {
         protected async Task MakeSureQueueAndExchangeExists(string queueName)
         {
-            var connection = await connectionFactory.CreateAdministrationConnection();
-            using (var channel = await connection.CreateChannel())
+            using (var connection = await connectionFactory.CreateAdministrationConnection())
+            using (var channel = await connection.CreateChannelWithPublishConfirmation())
             {
-                await channel.QueueDeclare(queueName, true, false, false, false, null, true);
+                await channel.QueueDeclare(queueName, false, true, false, false, null, true);
                 await channel.QueuePurge(queueName, true);
-
-                //to make sure we kill old subscriptions
-                await DeleteExchange(queueName);
 
                 await routingTopology.Initialize(channel, queueName);
             }
@@ -27,8 +24,8 @@
 
         async Task DeleteExchange(string exchangeName)
         {
-            var connection = await connectionFactory.CreateAdministrationConnection();
-            using (var channel = await connection.CreateChannel())
+            using (var connection = await connectionFactory.CreateAdministrationConnection())
+            using (var channel = await connection.CreateChannelWithPublishConfirmation())
             {
                 try
                 {
@@ -47,6 +44,9 @@
         [SetUp]
         public async Task SetUp()
         {
+            LogAdapter.IsDebugEnabled = true;
+            LogAdapter.ProtocolLevelLogEnabled = true;
+
             routingTopology = new ConventionalRoutingTopology(true);
             receivedMessages = new BlockingCollection<IncomingMessage>();
 
@@ -68,27 +68,30 @@
                 config.Host = "localhost";
             }
             connectionFactory = new RabbitMQ.ConnectionFactory(settings, config);
+            receiveConnection = await connectionFactory.CreateConnection("Receiver");
             channelProvider = new ChannelProvider(connectionFactory, routingTopology, true);
 
             messageDispatcher = new MessageDispatcher(channelProvider);
 
             var purger = new QueuePurger(connectionFactory);
 
-            messagePump = new MessagePump(await connectionFactory.CreateConnection("Receiver"), new MessageConverter(), "Unit test", channelProvider, purger, TimeSpan.FromMinutes(2), 3, 0);
+            messagePump = new MessagePump(receiveConnection, new MessageConverter(), "Unit test", channelProvider, purger, TimeSpan.FromMinutes(2), 3, 0);
 
+            //to make sure we kill old subscriptions (Todo: currently bugged)
+            await DeleteExchange(ReceiverQueue);
             await MakeSureQueueAndExchangeExists(ReceiverQueue);
 
             subscriptionManager = new SubscriptionManager(connectionFactory, routingTopology, ReceiverQueue);
 
-            messagePump.Init(messageContext =>
-            {
-                receivedMessages.Add(new IncomingMessage(messageContext.MessageId, messageContext.Headers, messageContext.Body));
-                return Task.CompletedTask;
-            },
+            await messagePump.Init(messageContext =>
+                {
+                    receivedMessages.Add(new IncomingMessage(messageContext.MessageId, messageContext.Headers, messageContext.Body));
+                    return Task.CompletedTask;
+                },
                 ErrorContext => Task.FromResult(ErrorHandleResult.Handled),
                 new CriticalError(_ => Task.CompletedTask),
                 new PushSettings(ReceiverQueue, "error", true, TransportTransactionMode.ReceiveOnly)
-            ).GetAwaiter().GetResult();
+            );
 
             messagePump.Start(new PushRuntimeSettings(MaximumConcurrency));
         }
@@ -99,16 +102,17 @@
             messagePump?.Stop().GetAwaiter().GetResult();
 
             channelProvider?.Dispose();
+            receiveConnection.Dispose();
         }
 
         protected IncomingMessage WaitForMessage()
         {
-            var waitTime = TimeSpan.FromSeconds(1);
+            var waitTime = TimeSpan.FromSeconds(5);
 
-            if (Debugger.IsAttached)
-            {
-                waitTime = TimeSpan.FromMinutes(10);
-            }
+            //if (Debugger.IsAttached)
+            //{
+            //    waitTime = TimeSpan.FromMinutes(10);
+            //}
 
             IncomingMessage message;
             receivedMessages.TryTake(out message, waitTime);
@@ -119,7 +123,8 @@
         protected const string ReceiverQueue = "testreceiver";
         protected MessageDispatcher messageDispatcher;
         protected RabbitMQ.ConnectionFactory connectionFactory;
-        private ChannelProvider channelProvider;
+        protected IConnection receiveConnection;
+        protected ChannelProvider channelProvider;
         protected MessagePump messagePump;
         BlockingCollection<IncomingMessage> receivedMessages;
 

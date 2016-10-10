@@ -28,14 +28,14 @@
         {
             var message = new OutgoingMessage(Guid.NewGuid().ToString(), new Dictionary<string, string>(), new byte[0]);
 
-            var connection = await connectionFactory.CreateAdministrationConnection().ConfigureAwait(false);
-            using (var channel = await connection.CreateChannel())
+            using (var connection = await connectionFactory.CreateAdministrationConnection())
+            using (var channel = await connection.CreateChannelWithPublishConfirmation())
             {
                 var properties = channel.RentBasicProperties();
 
                 properties.MessageId = message.MessageId;
 
-                await channel.BasicPublish(string.Empty, ReceiverQueue, false, properties, new ArraySegment<byte>( message.Body));
+                await channel.BasicPublishWithConfirmation("testreceiver", ReceiverQueue, false, properties, new ArraySegment<byte>(message.Body));
             }
 
             var received = WaitForMessage();
@@ -48,14 +48,14 @@
         {
             var message = new OutgoingMessage(Guid.NewGuid().ToString(), new Dictionary<string, string>(), new byte[0]);
 
-            var connection = await connectionFactory.CreateAdministrationConnection().ConfigureAwait(false);
-            using (var channel = await connection.CreateChannel())
+            using (var connection = await connectionFactory.CreateAdministrationConnection())
+            using (var channel = await connection.CreateChannelWithPublishConfirmation())
             {
                 var properties = channel.RentBasicProperties();
 
                 properties.MessageId = message.MessageId;
 
-                await channel.BasicPublish(string.Empty, ReceiverQueue, false, properties, new ArraySegment<byte>(message.Body));
+                await channel.BasicPublishWithConfirmation(string.Empty, ReceiverQueue, false, properties, new ArraySegment<byte>(message.Body));
             }
 
             var received = WaitForMessage();
@@ -70,15 +70,15 @@
 
             var typeName = typeof(MyMessage).FullName;
 
-            var connection = await connectionFactory.CreateAdministrationConnection().ConfigureAwait(false);
-            using (var channel = await connection.CreateChannel())
+            using (var connection = await connectionFactory.CreateAdministrationConnection())
+            using (var channel = await connection.CreateChannelWithPublishConfirmation())
             {
                 var properties = channel.RentBasicProperties();
 
                 properties.MessageId = message.MessageId;
                 properties.Type = typeName;
 
-                await channel.BasicPublish(string.Empty, ReceiverQueue, false, properties, new ArraySegment<byte>(message.Body));
+                await channel.BasicPublishWithConfirmation(string.Empty, ReceiverQueue, false, properties, new ArraySegment<byte>(message.Body));
             }
 
             var received = WaitForMessage();
