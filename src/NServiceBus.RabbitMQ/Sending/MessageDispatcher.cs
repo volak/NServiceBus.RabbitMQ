@@ -19,9 +19,10 @@
 
             var channel = await channelProvider.GetPublishChannel().ConfigureAwait(false);
 
-
-            var unicastTransportOperations = outgoingMessages.UnicastTransportOperations;
-            var multicastTransportOperations = outgoingMessages.MulticastTransportOperations;
+            try
+            {
+                var unicastTransportOperations = outgoingMessages.UnicastTransportOperations;
+                var multicastTransportOperations = outgoingMessages.MulticastTransportOperations;
 
             var tasks = new List<Task>(unicastTransportOperations.Count + multicastTransportOperations.Count);
 
@@ -35,9 +36,13 @@
                 tasks.Add(PublishMessage(operation, channel));
             }
 
-            await (tasks.Count == 1 ? tasks[0] : Task.WhenAll(tasks)).ConfigureAwait(false);
+                await (tasks.Count == 1 ? tasks[0] : Task.WhenAll(tasks)).ConfigureAwait(false);
+            }
+            finally
+            {
+                channelProvider.ReturnPublishChannel(channel);
+            }
         }
-
 
         async Task SendMessage(UnicastTransportOperation transportOperation, NextChannel channel)
         {

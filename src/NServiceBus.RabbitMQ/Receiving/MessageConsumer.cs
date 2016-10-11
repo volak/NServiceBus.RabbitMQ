@@ -132,8 +132,7 @@ namespace NServiceBus.Transport.RabbitMQ
 
                 var body = new byte[delivery.stream.Length];
                 await delivery.stream.ReadAsync(body, 0, (Int32)delivery.stream.Length).ConfigureAwait(false);
-
-                var strBody = Encoding.UTF8.GetString(body);
+                
                 await channel.RawSendInCaseOfFailure(queue, body, delivery.properties).ConfigureAwait(false);
             }
             catch (Exception ex)
