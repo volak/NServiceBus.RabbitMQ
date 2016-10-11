@@ -68,8 +68,8 @@
       <Private>False</Private>
     </Reference>
     <Reference Include="RabbitMqNext, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL">
-      <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\..\..\RabbitMqNext\src\RabbitMqNext\bin\Debug\RabbitMqNext.dll</HintPath>
+      <HintPath>..\packages\RabbitMqNext.1.0.12\lib\net461\RabbitMqNext.dll</HintPath>
+      <Private>True</Private>
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.Configuration" />
