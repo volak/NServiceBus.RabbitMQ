@@ -23,14 +23,12 @@
 
         public RabbitMQTransportInfrastructure(SettingsHolder settings, string connectionString)
         {
-            LogAdapter.LogDebugFn = (@class, message, ex) => Logger.Debug($"{@class} {message}", ex);
-            LogAdapter.LogWarnFn = (@class, message, ex) => Logger.Warn($"{@class} {message}", ex);
-            LogAdapter.LogErrorFn = (@class, message, ex) => Logger.Error($"{@class} {message}", ex);
+            LogAdapter.LogDebugFn = (@class, message, ex) => Logger.Debug($"{@class} {message}");
+            LogAdapter.LogWarnFn = (@class, message, ex) => Logger.Warn($"{@class} {message}");
+            LogAdapter.LogErrorFn = (@class, message, ex) => Logger.Error($"{@class} {message}");
             LogAdapter.IsDebugEnabled = Logger.IsDebugEnabled;
             LogAdapter.IsErrorEnabled = Logger.IsErrorEnabled;
             LogAdapter.IsWarningEnabled = Logger.IsWarnEnabled;
-
-
 
             this.settings = settings;
             var connectionConfiguration = new ConnectionStringParser(settings).Parse(connectionString);

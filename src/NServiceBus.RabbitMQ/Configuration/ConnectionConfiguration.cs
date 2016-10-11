@@ -50,8 +50,9 @@
             CertPassphrase = null;
             MaxChannels = 150;
 
-            var usePublisherConfirms = true;
-            settings.TryGet(SettingsKeys.UsePublisherConfirms, out usePublisherConfirms);
+            bool usePublisherConfirms;
+            if (!settings.TryGet(SettingsKeys.UsePublisherConfirms, out usePublisherConfirms))
+                usePublisherConfirms = true;
             publisherConfirms = usePublisherConfirms;
 
             SetDefaultClientProperties(settings);

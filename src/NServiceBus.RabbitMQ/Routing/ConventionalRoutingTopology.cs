@@ -97,11 +97,12 @@
                 return;
             }
 
-            var typeToProcess = type;
-            Logger.Info($"Creating exchange for {typeToProcess.FullName}");
-            await CreateExchange(channel, ExchangeName(typeToProcess)).ConfigureAwait(false);
-            var baseType = typeToProcess.BaseType;
+            Logger.Info($"Creating exchange for {type.FullName}");
+            await CreateExchange(channel, ExchangeName(type)).ConfigureAwait(false);
+            var baseType = type.BaseType;
 
+
+            var typeToProcess = type;
             while (baseType != null)
             {
                 Logger.Info($"Creating exchange for base type {baseType.FullName}");
@@ -110,15 +111,15 @@
                 typeToProcess = baseType;
                 baseType = typeToProcess.BaseType;
             }
+
             if (type.IsInterface)
             {
                 foreach (var interfaceType in type.GetInterfaces())
                 {
                     Logger.Info($"Creating exchange for interface type {interfaceType.FullName}");
-                    var exchangeName = ExchangeName(interfaceType);
 
-                    await CreateExchange(channel, exchangeName).ConfigureAwait(false);
-                    await channel.ExchangeBind(ExchangeName(type), exchangeName, string.Empty, null, true).ConfigureAwait(false);
+                    await CreateExchange(channel, ExchangeName(interfaceType)).ConfigureAwait(false);
+                    await channel.ExchangeBind(ExchangeName(type), ExchangeName(interfaceType), string.Empty, null, true).ConfigureAwait(false);
                 }
             }
 
