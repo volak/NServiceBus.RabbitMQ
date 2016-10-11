@@ -24,8 +24,8 @@
         public RabbitMQTransportInfrastructure(SettingsHolder settings, string connectionString)
         {
             LogAdapter.LogDebugFn = (@class, message, ex) => Logger.Debug($"{@class} {message}");
-            LogAdapter.LogWarnFn = (@class, message, ex) => Logger.Warn($"{@class} {message}");
-            LogAdapter.LogErrorFn = (@class, message, ex) => Logger.Error($"{@class} {message}");
+            LogAdapter.LogWarnFn = (@class, message, ex) => Logger.Warn($"{@class} {message}", ex);
+            LogAdapter.LogErrorFn = (@class, message, ex) => Logger.Error($"{@class} {message}", ex);
             LogAdapter.IsDebugEnabled = Logger.IsDebugEnabled;
             LogAdapter.IsErrorEnabled = Logger.IsErrorEnabled;
             LogAdapter.IsWarningEnabled = Logger.IsWarnEnabled;
@@ -34,17 +34,11 @@
             var connectionConfiguration = new ConnectionStringParser(settings).Parse(connectionString);
 
             CreateTopology();
-
-            ushort keepChannels;
-            if (!settings.TryGet(SettingsKeys.KeepChannels, out keepChannels))
-                keepChannels = 30;
-            int maxUnconfirmed;
-            if (!settings.TryGet(SettingsKeys.MaxUnconfirmed, out maxUnconfirmed))
-                maxUnconfirmed = 100;
-
-            connectionFactory = new ConnectionFactory(settings, connectionConfiguration, keepChannels);
             
-            channelProvider = new ChannelProvider(connectionFactory, routingTopology, connectionConfiguration.publisherConfirms, keepChannels, maxUnconfirmed);
+
+            connectionFactory = new ConnectionFactory(settings, connectionConfiguration);
+            
+            channelProvider = new ChannelProvider(connectionFactory, routingTopology, connectionConfiguration.publisherConfirms);
 
             RequireOutboxConsent = false;
         }
