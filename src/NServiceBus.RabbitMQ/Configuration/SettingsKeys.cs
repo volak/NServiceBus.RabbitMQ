@@ -7,5 +7,7 @@
         public const string UsePublisherConfirms = "RabbitMQ.UsePublisherConfirms";
         public const string PrefetchMultiplier = "RabbitMQ.PrefetchMultiplier";
         public const string PrefetchCount = "RabbitMQ.PrefetchCount";
+        public const string KeepChannels = "RabbitMQ.KeepChannels";
+        public const string MaxUnconfirmed = "RabbitMQ.MaxUnconfirmed";
     }
 }

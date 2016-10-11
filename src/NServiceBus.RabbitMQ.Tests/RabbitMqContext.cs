@@ -67,9 +67,9 @@
                 config = new ConnectionConfiguration(settings);
                 config.Host = "localhost";
             }
-            connectionFactory = new RabbitMQ.ConnectionFactory(settings, config);
+            connectionFactory = new RabbitMQ.ConnectionFactory(settings, config, 30);
             receiveConnection = await connectionFactory.CreateConnection("Receiver");
-            channelProvider = new ChannelProvider(connectionFactory, routingTopology, true);
+            channelProvider = new ChannelProvider(connectionFactory, routingTopology, true, 30, 100);
 
             messageDispatcher = new MessageDispatcher(channelProvider);
 
@@ -77,7 +77,7 @@
 
             messagePump = new MessagePump(receiveConnection, new MessageConverter(), "Unit test", channelProvider, purger, TimeSpan.FromMinutes(2), 3, 0);
 
-            //to make sure we kill old subscriptions (Todo: currently bugged)
+            //to make sure we kill old subscriptions
             await DeleteExchange(ReceiverQueue);
             await MakeSureQueueAndExchangeExists(ReceiverQueue);
 

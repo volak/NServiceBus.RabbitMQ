@@ -64,31 +64,36 @@
 
         public void Start(PushRuntimeSettings limitations)
         {
+            Logger.Info($"Starting message pump {settings.InputQueue}");
             maxConcurrency = limitations.MaxConcurrency;
 
             // Todo: MaxConcurrency
             // I could use MaxConcurrency to specify the number of channels like here
             // or I would use it to specify how many connections aka threads should exist
-            var connectionsTasks = new List<Task>();
+
             for (var i = 0; i < maxConcurrency; i++)
             {
-                connectionsTasks.Add(TaskEx.StartNew(i, async (state) =>
-                {
-                    var channel = await connection.CreateChannel().ConfigureAwait(false);
-                    await channel.BasicQos(0, (ushort)Math.Min(prefetchMultiplier, ushort.MaxValue), false).ConfigureAwait(false);
-
-                    var consumer = new MessageConsumer(channel, onMessage, onError, channelProvider, settings, messageConverter, circuitBreaker);
-                    await channel.BasicConsume(ConsumeMode.SerializedWithBufferCopy, consumer, settings.InputQueue, $"{settings.InputQueue}.{consumerTag}.{(int)state}", false, false, null, true).ConfigureAwait(false);
-
-                    channels.Add(channel);
-                }));
+                CreateConsumer(i).Wait();
             }
 
-            Task.WhenAll(connectionsTasks).Wait();
+        }
+
+        private async Task CreateConsumer(int num)
+        {
+
+            Logger.Debug($"Creating consumer {consumerTag}.{num} with prefetch {prefetchMultiplier}");
+            var channel = await connection.CreateChannel().ConfigureAwait(false);
+            await channel.BasicQos(0, (ushort)Math.Min(prefetchMultiplier, ushort.MaxValue), false).ConfigureAwait(false);
+
+            var consumer = new MessageConsumer(channel, onMessage, onError, channelProvider, settings, messageConverter, circuitBreaker);
+            await channel.BasicConsume(ConsumeMode.SerializedWithBufferCopy, consumer, settings.InputQueue, $"{consumerTag}.{num}", false, false, null, true).ConfigureAwait(false);
+
+            channels.Add(channel);
         }
 
         public async Task Stop()
         {
+            Logger.Info($"Stopping message pump {settings.InputQueue}");
             while (channels.Count > 0)
             {
                 IChannel chan;
@@ -101,7 +106,7 @@
                     chan.Dispose();
                 }
             }
-            
+
             if (!connection.IsClosed)
                 connection.Dispose();
         }

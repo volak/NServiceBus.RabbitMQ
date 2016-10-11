@@ -130,17 +130,10 @@ namespace NServiceBus.Transport.RabbitMQ
             {
                 var channel = await _channelProvider.GetPublishChannel().ConfigureAwait(false);
 
-                try
-                {
-                    var body = new byte[delivery.stream.Length];
-                    await delivery.stream.ReadAsync(body, 0, (Int32)delivery.stream.Length).ConfigureAwait(false);
+                var body = new byte[delivery.stream.Length];
+                await delivery.stream.ReadAsync(body, 0, (Int32)delivery.stream.Length).ConfigureAwait(false);
 
-                    await channel.RawSendInCaseOfFailure(queue, body, delivery.properties).ConfigureAwait(false);
-                }
-                finally
-                {
-                    _channelProvider.ReturnPublishChannel(channel);
-                }
+                await channel.RawSendInCaseOfFailure(queue, body, delivery.properties).ConfigureAwait(false);
             }
             catch (Exception ex)
             {
@@ -159,6 +152,6 @@ namespace NServiceBus.Transport.RabbitMQ
                 Logger.Warn($"Failed to acknowledge poison message{(messageId == null ? "" : $" '{messageId}'")} because the channel was closed. The message was sent to queue '{queue}' but also returned to the original queue.", ex);
             }
         }
-        
+
     }
 }

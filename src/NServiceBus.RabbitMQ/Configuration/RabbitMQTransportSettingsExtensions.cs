@@ -103,5 +103,26 @@
             transportExtensions.GetSettings().Set(SettingsKeys.PrefetchCount, prefetchCount);
             return transportExtensions;
         }
+
+        /// <summary>
+        /// How many publisher channels to keep around
+        /// </summary>
+        /// <param name="transportExtensions"></param>
+        /// <param name="keepChannels">number of channels.</param>
+        public static TransportExtensions<RabbitMQTransport> KeepChannels(this TransportExtensions<RabbitMQTransport> transportExtensions, ushort keepChannels)
+        {
+            transportExtensions.GetSettings().Set(SettingsKeys.KeepChannels, keepChannels);
+            return transportExtensions;
+        }
+        /// <summary>
+        /// How many unconfirmed messages to allow per channel
+        /// </summary>
+        /// <param name="transportExtensions"></param>
+        /// <param name="max">max number of messages.</param>
+        public static TransportExtensions<RabbitMQTransport> MaxUnconfirmed(this TransportExtensions<RabbitMQTransport> transportExtensions, int max)
+        {
+            transportExtensions.GetSettings().Set(SettingsKeys.MaxUnconfirmed, max);
+            return transportExtensions;
+        }
     }
 }

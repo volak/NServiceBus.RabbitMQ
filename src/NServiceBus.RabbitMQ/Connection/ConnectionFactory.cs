@@ -13,7 +13,7 @@ namespace NServiceBus.Transport.RabbitMQ
         readonly Func<String, Task<IConnection>> connectionFactory;
         readonly ReadOnlySettings settings;
 
-        public ConnectionFactory(ReadOnlySettings settings, ConnectionConfiguration connectionConfiguration)
+        public ConnectionFactory(ReadOnlySettings settings, ConnectionConfiguration connectionConfiguration, ushort keepChannels)
         {
             if (settings == null)
             {
@@ -35,10 +35,9 @@ namespace NServiceBus.Transport.RabbitMQ
                 username: connectionConfiguration.UserName,
                 password: connectionConfiguration.Password,
                 recoverySettings: AutoRecoverySettings.All,
-                //maxChannels: connectionConfiguration.MaxChannels,
+                maxChannels: keepChannels,
                 connectionName: connectionName
-        );
-
+            );
         }
 
 

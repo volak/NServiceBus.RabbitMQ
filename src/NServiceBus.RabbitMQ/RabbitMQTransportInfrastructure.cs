@@ -37,19 +37,29 @@
 
             CreateTopology();
 
-            connectionFactory = new ConnectionFactory(settings, connectionConfiguration);
-            channelProvider = new ChannelProvider(connectionFactory, routingTopology, connectionConfiguration.publisherConfirms);
+            ushort keepChannels;
+            if (!settings.TryGet(SettingsKeys.KeepChannels, out keepChannels))
+                keepChannels = 30;
+            int maxUnconfirmed;
+            if (!settings.TryGet(SettingsKeys.MaxUnconfirmed, out maxUnconfirmed))
+                maxUnconfirmed = 100;
+
+            connectionFactory = new ConnectionFactory(settings, connectionConfiguration, keepChannels);
+            
+            channelProvider = new ChannelProvider(connectionFactory, routingTopology, connectionConfiguration.publisherConfirms, keepChannels, maxUnconfirmed);
 
             RequireOutboxConsent = false;
         }
 
         public override async Task Start()
         {
+            Logger.Info("Starting RabbitMqNext transport");
             receiveConnection = await connectionFactory.CreateConnection("Receive").ConfigureAwait(false);
         }
 
         public override Task Stop()
         {
+            Logger.Info("Stopping RabbitMqNext transport");
             receiveConnection.Dispose();
             return Task.CompletedTask;
         }
@@ -125,10 +135,12 @@
                     routingTopology = new ConventionalRoutingTopology(durable);
                 }
             }
+            Logger.Debug($"Using routing topology {routingTopology.GetType().Name}");
         }
 
         IPushMessages CreateMessagePump()
         {
+            Logger.Debug("Creating message pump");
             MessageConverter messageConverter;
 
             if (settings.HasSetting(SettingsKeys.CustomMessageIdStrategy))

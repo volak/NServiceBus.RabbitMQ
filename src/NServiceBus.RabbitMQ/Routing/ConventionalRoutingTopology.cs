@@ -4,6 +4,7 @@
     using System.Collections.Concurrent;
     using global::RabbitMqNext;
     using System.Threading.Tasks;
+    using Logging;
 
     /// <summary>
     /// Implements the RabbitMQ routing topology as described at http://codebetter.com/drusellers/2011/05/08/brain-dump-conventional-routing-in-rabbitmq/
@@ -22,6 +23,7 @@
     /// </summary>
     class ConventionalRoutingTopology : IRoutingTopology
     {
+        readonly static ILog Logger = LogManager.GetLogger("ConventionalRoutingTopology");
         readonly bool useDurableExchanges;
 
         public ConventionalRoutingTopology(bool useDurableExchanges)
@@ -96,11 +98,13 @@
             }
 
             var typeToProcess = type;
+            Logger.Info($"Creating exchange for {typeToProcess.FullName}");
             await CreateExchange(channel, ExchangeName(typeToProcess)).ConfigureAwait(false);
             var baseType = typeToProcess.BaseType;
 
             while (baseType != null)
             {
+                Logger.Info($"Creating exchange for base type {baseType.FullName}");
                 await CreateExchange(channel, ExchangeName(baseType)).ConfigureAwait(false);
                 await channel.ExchangeBind(ExchangeName(typeToProcess), ExchangeName(baseType), string.Empty, null, true).ConfigureAwait(false);
                 typeToProcess = baseType;
@@ -110,6 +114,7 @@
             {
                 foreach (var interfaceType in type.GetInterfaces())
                 {
+                    Logger.Info($"Creating exchange for interface type {interfaceType.FullName}");
                     var exchangeName = ExchangeName(interfaceType);
 
                     await CreateExchange(channel, exchangeName).ConfigureAwait(false);

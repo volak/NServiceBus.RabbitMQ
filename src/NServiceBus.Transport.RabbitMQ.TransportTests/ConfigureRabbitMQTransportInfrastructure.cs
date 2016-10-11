@@ -46,7 +46,7 @@ class ConfigureRabbitMQTransportInfrastructure : IConfigureTransportInfrastructu
         var connectionFactory = CreateConnectionFactory();
 
         using (var connection = await connectionFactory("Test Queue Purger"))
-        using (var channel = await connection.CreateChannel())
+        using (var channel = await connection.CreateChannelWithPublishConfirmation())
         {
             foreach (var queue in queueBindings.ReceivingAddresses)
             {
@@ -87,7 +87,8 @@ class ConfigureRabbitMQTransportInfrastructure : IConfigureTransportInfrastructu
             vhost: virtualHost,
             username: username,
             password: password,
-            recoverySettings: new RabbitMqNext.AutoRecoverySettings { Enabled = true, RecoverBindings = true },
+            recoverySettings: AutoRecoverySettings.All,
+            maxChannels: ushort.MaxValue,
             connectionName: name
             );
     }

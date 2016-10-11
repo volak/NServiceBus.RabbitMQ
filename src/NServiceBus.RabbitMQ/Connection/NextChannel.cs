@@ -6,21 +6,21 @@ namespace NServiceBus.Transport.RabbitMQ
     using RabbitMqNext;
 
     [Janitor.SkipWeaving]
-    class ConfirmsAwareChannel : IDisposable
+    class NextChannel : IDisposable
     {
-        public ConfirmsAwareChannel(IConnection connection, IRoutingTopology routingTopology, bool usePublisherConfirms)
+        public NextChannel(IConnection connection, IRoutingTopology routingTopology, bool usePublisherConfirms, int maxUnconfirmed = 100)
         {
             if (usePublisherConfirms)
-                channel = connection.CreateChannelWithPublishConfirmation().Result;
+                channel = connection.CreateChannelWithPublishConfirmation(maxunconfirmedMessages: maxUnconfirmed).Result;
             else
                 channel = connection.CreateChannel().Result;
-
             
             this.routingTopology = routingTopology;
             
         }
 
         public BasicProperties RentBasicProperties() => channel.RentBasicProperties();
+        public void ReturnBasicProperties(BasicProperties props) => channel.Return(props);
 
         public bool IsOpen => !channel.IsClosed;
 
@@ -55,6 +55,6 @@ namespace NServiceBus.Transport.RabbitMQ
         readonly IRoutingTopology routingTopology;
         bool disposed;
 
-        static readonly ILog Logger = LogManager.GetLogger(typeof(ConfirmsAwareChannel));
+        static readonly ILog Logger = LogManager.GetLogger(typeof(NextChannel));
     }
 }

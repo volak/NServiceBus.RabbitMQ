@@ -72,7 +72,10 @@ class ConfigureEndpointRabbitMQTransport : IConfigureEndpointTestExecution
             host,
             vhost: virtualHost,
             username: username,
-            password: password
+            password: password,
+            recoverySettings: AutoRecoverySettings.All,
+            maxChannels: ushort.MaxValue,
+            connectionName: "testing"
             );
     }
 
