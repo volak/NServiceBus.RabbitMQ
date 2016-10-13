@@ -11,7 +11,7 @@
     <releaseNotes></releaseNotes>
     <tags>nservicebus servicebus cqrs publish subscribe rabbitmq rabbitmqnext</tags>
     <dependencies>
-      <dependency id="NServiceBus" version="[6.0.0-beta, 7.0.0)" />
+      <dependency id="NServiceBus" version="[6.0.0, 7.0.0)" />
       <dependency id="RabbitMQNext" version="[1.0.0, 1.1.0)" />
     </dependencies>
   </metadata>
