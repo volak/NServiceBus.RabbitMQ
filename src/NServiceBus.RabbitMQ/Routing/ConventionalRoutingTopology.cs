@@ -72,6 +72,8 @@
 
         public void Initialize(IModel channel, string mainQueue)
         {
+            channel.QueueDeclare(mainQueue, useDurableExchanges, false, false, null);
+
             CreateExchange(channel, mainQueue);
             channel.QueueBind(mainQueue, mainQueue, string.Empty);
         }

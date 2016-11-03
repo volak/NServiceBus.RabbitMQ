@@ -37,7 +37,7 @@
 
         void CreateQueueIfNecessary(IModel channel, string receivingAddress)
         {
-            channel.QueueDeclare(receivingAddress, durableMessagesEnabled, false, false, null);
+
 
             routingTopology.Initialize(channel, receivingAddress);
         }

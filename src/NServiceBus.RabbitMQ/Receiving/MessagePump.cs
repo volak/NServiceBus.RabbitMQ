@@ -8,6 +8,7 @@
     using global::RabbitMQ.Client;
     using global::RabbitMQ.Client.Events;
     using global::RabbitMQ.Client.Exceptions;
+    using Janitor;
     using Logging;
 
     class MessagePump : IPushMessages, IDisposable
@@ -15,8 +16,8 @@
         static readonly ILog Logger = LogManager.GetLogger(typeof(MessagePump));
         static readonly TransportTransaction transportTranaction = new TransportTransaction();
         static readonly ContextBag contextBag = new ContextBag();
-
-        readonly ConnectionFactory connectionFactory;
+        [SkipWeaving]
+        readonly IConnection connection;
         readonly MessageConverter messageConverter;
         readonly string consumerTag;
         readonly IChannelProvider channelProvider;
@@ -36,15 +37,14 @@
         int maxConcurrency;
         SemaphoreSlim semaphore;
         CancellationTokenSource messageProcessing;
-        IConnection connection;
         EventingBasicConsumer consumer;
 
         // Stop
         TaskCompletionSource<bool> connectionShutdownCompleted;
 
-        public MessagePump(ConnectionFactory connectionFactory, MessageConverter messageConverter, string consumerTag, IChannelProvider channelProvider, QueuePurger queuePurger, TimeSpan timeToWaitBeforeTriggeringCircuitBreaker, int prefetchMultiplier, ushort overriddenPrefetchCount)
+        public MessagePump(IConnection connection, MessageConverter messageConverter, string consumerTag, IChannelProvider channelProvider, QueuePurger queuePurger, TimeSpan timeToWaitBeforeTriggeringCircuitBreaker, int prefetchMultiplier, ushort overriddenPrefetchCount)
         {
-            this.connectionFactory = connectionFactory;
+            this.connection = connection;
             this.messageConverter = messageConverter;
             this.consumerTag = consumerTag;
             this.channelProvider = channelProvider;
@@ -77,9 +77,7 @@
             maxConcurrency = limitations.MaxConcurrency;
             semaphore = new SemaphoreSlim(limitations.MaxConcurrency, limitations.MaxConcurrency);
             messageProcessing = new CancellationTokenSource();
-
-            connection = connectionFactory.CreateConnection($"{settings.InputQueue} MessagePump");
-
+            
             var channel = connection.CreateModel();
 
             long prefetchCount;

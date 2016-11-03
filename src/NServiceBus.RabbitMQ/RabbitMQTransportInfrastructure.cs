@@ -4,6 +4,7 @@
     using System.Collections.Generic;
     using System.Text;
     using System.Threading.Tasks;
+    using global::RabbitMQ.Client;
     using global::RabbitMQ.Client.Events;
     using Janitor;
     using Performance.TimeToBeReceived;
@@ -17,15 +18,13 @@
         readonly ConnectionFactory connectionFactory;
         readonly ChannelProvider channelProvider;
         IRoutingTopology routingTopology;
+        IConnection receiveConnection;
 
         public RabbitMQTransportInfrastructure(SettingsHolder settings, string connectionString)
         {
             this.settings = settings;
 
             var connectionConfiguration = new ConnectionStringParser(settings).Parse(connectionString);
-            connectionFactory = new ConnectionFactory(connectionConfiguration);
-
-            routingTopology = CreateRoutingTopology();
 
             bool usePublisherConfirms;
             if (!settings.TryGet(SettingsKeys.UsePublisherConfirms, out usePublisherConfirms))
@@ -33,9 +32,26 @@
                 usePublisherConfirms = true;
             }
 
+            connectionFactory = new ConnectionFactory(settings.InstanceSpecificQueue(), connectionConfiguration);
+            routingTopology = CreateRoutingTopology();
+
+
+
             channelProvider = new ChannelProvider(connectionFactory, routingTopology, usePublisherConfirms);
 
             RequireOutboxConsent = false;
+        }
+
+        public override Task Start()
+        {
+            receiveConnection = connectionFactory.CreateConnection("Receive");
+            return TaskEx.CompletedTask;
+        }
+
+        public override Task Stop()
+        {
+            receiveConnection.Dispose();
+            return TaskEx.CompletedTask;
         }
 
         public override IEnumerable<Type> DeliveryConstraints => new[] { typeof(DiscardIfNotReceivedBefore), typeof(NonDurableDelivery) };
@@ -85,6 +101,7 @@
 
         public void Dispose()
         {
+            receiveConnection.Dispose();
             channelProvider.Dispose();
         }
 
@@ -142,7 +159,7 @@
                 prefetchCount = 0;
             }
 
-            return new MessagePump(connectionFactory, messageConverter, consumerTag, channelProvider, queuePurger, timeToWaitBeforeTriggeringCircuitBreaker, prefetchMultiplier, prefetchCount);
+            return new MessagePump(receiveConnection, messageConverter, consumerTag, channelProvider, queuePurger, timeToWaitBeforeTriggeringCircuitBreaker, prefetchMultiplier, prefetchCount);
         }
     }
 }

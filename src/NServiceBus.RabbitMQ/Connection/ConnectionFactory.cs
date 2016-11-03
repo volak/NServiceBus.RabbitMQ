@@ -7,9 +7,10 @@
     class ConnectionFactory
     {
         readonly global::RabbitMQ.Client.ConnectionFactory connectionFactory;
+        readonly string instanceName;
         readonly object lockObject = new object();
 
-        public ConnectionFactory(ConnectionConfiguration connectionConfiguration)
+        public ConnectionFactory(string instanceName, ConnectionConfiguration connectionConfiguration)
         {
             if (connectionConfiguration == null)
             {
@@ -20,6 +21,7 @@
             {
                 throw new ArgumentException("The connectionConfiguration has a null Host.", nameof(connectionConfiguration));
             }
+            this.instanceName = instanceName;
 
             connectionFactory = new global::RabbitMQ.Client.ConnectionFactory
             {
@@ -58,7 +60,7 @@
             {
                 connectionFactory.ClientProperties["connected"] = DateTime.Now.ToString("G");
 
-                return connectionFactory.CreateConnection(connectionName);
+                return connectionFactory.CreateConnection($"{instanceName}.{connectionName}");
             }
         }
     }

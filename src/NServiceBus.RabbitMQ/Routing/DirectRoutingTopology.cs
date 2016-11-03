@@ -42,6 +42,7 @@
 
         public void Initialize(IModel channel, string main)
         {
+            channel.QueueDeclare(main, useDurableExchanges, false, false, null);
             //nothing needs to be done for direct routing
         }
 

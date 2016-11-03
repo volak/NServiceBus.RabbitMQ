@@ -67,14 +67,14 @@
                 config.Host = "localhost";
             }
 
-            connectionFactory = new ConnectionFactory(config);
+            connectionFactory = new ConnectionFactory("test", config);
             channelProvider = new ChannelProvider(connectionFactory, routingTopology, true);
 
             messageDispatcher = new MessageDispatcher(channelProvider);
 
             var purger = new QueuePurger(connectionFactory);
 
-            messagePump = new MessagePump(connectionFactory, new MessageConverter(), "Unit test", channelProvider, purger, TimeSpan.FromMinutes(2), 3, 0);
+            messagePump = new MessagePump(connectionFactory.CreatePublishConnection(), new MessageConverter(), "Unit test", channelProvider, purger, TimeSpan.FromMinutes(2), 3, 0);
 
             MakeSureQueueAndExchangeExists(ReceiverQueue);
 
