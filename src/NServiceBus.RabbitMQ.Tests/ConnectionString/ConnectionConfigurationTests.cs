@@ -1,9 +1,8 @@
-﻿namespace NServiceBus.Transports.RabbitMQ.Tests.ConnectionString
+﻿namespace NServiceBus.Transport.RabbitMQ.Tests.ConnectionString
 {
     using System;
-    using Config;
     using NUnit.Framework;
-    using Settings;
+    using RabbitMQ;
 
     [TestFixture]
     public class ConnectionConfigurationTests
@@ -13,10 +12,7 @@
         [SetUp]
         public void Setup()
         {
-            var settings = new SettingsHolder();
-            settings.Set<NServiceBus.Routing.EndpointName>(new NServiceBus.Routing.EndpointName("endpoint"));
-
-            defaults = new ConnectionConfiguration(settings);
+            defaults = new ConnectionConfiguration("endpoint");
         }
 
         [Test]
@@ -53,18 +49,6 @@
         public void Should_set_default_requested_heartbeat()
         {
             Assert.AreEqual(defaults.RequestedHeartbeat, 5);
-        }
-
-        [Test]
-        public void Should_set_default_use_publisher_confirms()
-        {
-            Assert.AreEqual(defaults.UsePublisherConfirms, true);
-        }
-
-        [Test]
-        public void Should_set_default_max_wait_time_for_confirms()
-        {
-            Assert.AreEqual(defaults.MaxWaitTimeForConfirms, TimeSpan.FromSeconds(30));
         }
 
         [Test]

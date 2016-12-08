@@ -1,25 +1,23 @@
-﻿namespace NServiceBus.RabbitMQ.AcceptanceTests
+﻿namespace NServiceBus.Transport.RabbitMQ.AcceptanceTests
 {
-    using NServiceBus.AcceptanceTesting;
+    using System.Collections.Generic;
+    using System.Text;
+    using System.Threading.Tasks;
+    using AcceptanceTesting;
+    using Extensibility;
+    using Features;
     using NServiceBus.AcceptanceTests;
     using NServiceBus.AcceptanceTests.EndpointTemplates;
-    using NServiceBus.Extensibility;
-    using NServiceBus.MessageInterfaces;
-    using NServiceBus.Routing;
-    using NServiceBus.Serialization;
-    using NServiceBus.Settings;
-    using NServiceBus.Transports;
     using NUnit.Framework;
-    using System;
-    using System.Collections.Generic;
-    using System.IO;
-    using System.Runtime.Serialization.Formatters.Binary;
-    using System.Threading.Tasks;
+    using Routing;
+    using Settings;
 
     public class When_using_a_custom_message_id_strategy : NServiceBusAcceptanceTest
     {
+        const string customMessageId = "CustomMessageId";
+
         [Test]
-        public async Task Should_be_able_to_receive_messages_with_no_id()
+        public async Task Should_use_custom_strategy_to_set_message_id_on_message_with_no_id()
         {
             var context = await Scenario.Define<MyContext>()
                    .WithEndpoint<Receiver>()
@@ -27,8 +25,8 @@
                    .Run();
 
             Assert.True(context.GotTheMessage, "Should receive the message");
+            Assert.AreEqual(context.ReceivedMessageId, customMessageId, "Message id should equal custom id value");
         }
-
 
         public class Receiver : EndpointConfigurationBuilder
         {
@@ -36,42 +34,51 @@
             {
                 EndpointSetup<DefaultServer>(c =>
                 {
-                    c.UseSerialization<MyCustomSerializerDefinition>();
+                    c.EnableFeature<StarterFeature>();
                     c.UseTransport<RabbitMQTransport>()
-                        //just returning a guid here, not suitable for production use
-                        .CustomMessageIdStrategy(m => Guid.NewGuid().ToString());
+                        .CustomMessageIdStrategy(m => customMessageId);
                 });
             }
 
-            class Starter : IWantToRunWhenBusStartsAndStops
+            class StarterFeature : Feature
             {
-                readonly IDispatchMessages dispatchMessages;
-                readonly ReadOnlySettings settings;
-
-                public Starter(IDispatchMessages dispatchMessages, ReadOnlySettings settings)
+                protected override void Setup(FeatureConfigurationContext context)
                 {
-                    this.dispatchMessages = dispatchMessages;
-                    this.settings = settings;
+                    context.Container.ConfigureComponent<Starter>(DependencyLifecycle.InstancePerCall);
+                    context.RegisterStartupTask(b => b.Build<Starter>());
                 }
 
-                public async Task Start(IMessageSession context)
+                class Starter : FeatureStartupTask
                 {
-                    using (var stream = new MemoryStream())
+                    public Starter(IDispatchMessages dispatchMessages, ReadOnlySettings settings)
                     {
-                        var serializer = new MyCustomSerializer();
-                        serializer.Serialize(new MyRequest(), stream);
+                        this.dispatchMessages = dispatchMessages;
+                        this.settings = settings;
+                    }
+
+                    protected override Task OnStart(IMessageSession session)
+                    {
+                        //Use feature to send message that has no message id
+
+                        var messageBody = "<MyRequest></MyRequest>";
 
                         var message = new OutgoingMessage(
                             string.Empty,
-                            new Dictionary<string, string> { { Headers.EnclosedMessageTypes, typeof(MyRequest).FullName } },
-                            stream.ToArray());
+                            new Dictionary<string, string>
+                            {
+                                    { Headers.EnclosedMessageTypes, typeof(MyRequest).FullName }
+                            },
+                            Encoding.UTF8.GetBytes(messageBody));
 
-                        var transportOperation = new TransportOperation(message, new UnicastAddressTag(settings.EndpointName().ToString()));
-                        await dispatchMessages.Dispatch(new TransportOperations(transportOperation), new ContextBag());
+                        var transportOperation = new TransportOperation(message, new UnicastAddressTag(settings.EndpointName()));
+                        return dispatchMessages.Dispatch(new TransportOperations(transportOperation), new TransportTransaction(), new ContextBag());
                     }
-                }
 
-                public Task Stop(IMessageSession context) => TaskEx.CompletedTask;
+                    protected override Task OnStop(IMessageSession session) => TaskEx.CompletedTask;
+
+                    readonly IDispatchMessages dispatchMessages;
+                    readonly ReadOnlySettings settings;
+                }
             }
 
             class MyEventHandler : IHandleMessages<MyRequest>
@@ -86,13 +93,13 @@
                 public Task Handle(MyRequest message, IMessageHandlerContext context)
                 {
                     myContext.GotTheMessage = true;
+                    myContext.ReceivedMessageId = context.MessageId;
 
                     return TaskEx.CompletedTask;
                 }
             }
         }
 
-        [Serializable]
         class MyRequest : IMessage
         {
         }
@@ -100,38 +107,7 @@
         class MyContext : ScenarioContext
         {
             public bool GotTheMessage { get; set; }
-        }
-
-        class MyCustomSerializerDefinition : SerializationDefinition
-        {
-            public override Func<IMessageMapper, IMessageSerializer> Configure(ReadOnlySettings settings)
-            {
-                return mapper => new MyCustomSerializer();
-            }
-        }
-
-        class MyCustomSerializer : IMessageSerializer
-        {
-            public void Serialize(object message, Stream stream)
-            {
-                var serializer = new BinaryFormatter();
-                serializer.Serialize(stream, message);
-            }
-
-            public object[] Deserialize(Stream stream, IList<Type> messageTypes = null)
-            {
-                var serializer = new BinaryFormatter();
-
-                stream.Position = 0;
-                var msg = serializer.Deserialize(stream);
-
-                return new[]
-                {
-                    msg
-                };
-            }
-
-            public string ContentType => "MyCustomSerializer";
+            public string ReceivedMessageId { get; set; }
         }
     }
 }

@@ -1,7 +1,8 @@
 ﻿namespace NServiceBus
 {
-    using NServiceBus.Settings;
-    using NServiceBus.Transports;
+    using Settings;
+    using Transport.RabbitMQ;
+    using Transport;
 
     /// <summary>
     /// Transport definition for RabbitMQ.
@@ -14,7 +15,7 @@
         /// <param name="settings">An instance of the current settings.</param>
         /// <param name="connectionString">The connection string.</param>
         /// <returns>The supported factories.</returns>
-        protected override TransportInfrastructure Initialize(SettingsHolder settings, string connectionString) => new RabbitMQTransportInfrastructure(settings, connectionString);
+        public override TransportInfrastructure Initialize(SettingsHolder settings, string connectionString) => new RabbitMQTransportInfrastructure(settings, connectionString);
 
         /// <summary>
         /// Gets an example connection string to use when reporting the lack of a configured connection string to the user.

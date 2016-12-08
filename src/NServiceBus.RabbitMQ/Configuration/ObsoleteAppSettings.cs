@@ -1,7 +1,7 @@
-﻿namespace NServiceBus.Transports.RabbitMQ.Config
+﻿namespace NServiceBus.Transport.RabbitMQ
 {
     using System.Configuration;
-    using NServiceBus.Logging;
+    using Logging;
 
     static class ObsoleteAppSettings
     {
@@ -13,7 +13,7 @@
 
             if (timeToWaitBeforeTriggering != null)
             {
-                var message = "The 'TimeToWaitBeforeTriggering' configuration setting has been removed. Please use 'EndpointConfiguration.TimeToWaitBeforeTriggeringCircuitBreaker' instead.";
+                var message = "The 'TimeToWaitBeforeTriggering' configuration setting has been removed. Use 'EndpointConfiguration.UseTransport<RabbitMQTransport>().TimeToWaitBeforeTriggeringCircuitBreaker' instead.";
 
                 Logger.Error(message);
 
@@ -24,7 +24,7 @@
 
             if (delayAfterFailure != null)
             {
-                var message = "The 'DelayAfterFailure' configuration setting has been removed. Please consult the documentation for further information.";
+                var message = "The 'DelayAfterFailure' configuration setting has been removed. Consult the documentation for further information.";
 
                 Logger.Error(message);
 

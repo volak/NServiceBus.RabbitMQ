@@ -1,24 +1,23 @@
-﻿namespace NServiceBus.Transports.RabbitMQ
+﻿namespace NServiceBus.Transport.RabbitMQ
 {
     using System;
     using System.Collections.Generic;
     using System.Globalization;
     using System.Linq;
+    using System.Text;
     using global::RabbitMQ.Client;
-    using NServiceBus.DeliveryConstraints;
-    using NServiceBus.Performance.TimeToBeReceived;
-
-    using Headers = NServiceBus.Headers;
+    using DeliveryConstraints;
+    using Performance.TimeToBeReceived;
 
     static class BasicPropertiesExtensions
     {
-        public static void Fill(this IBasicProperties properties, OutgoingMessage message, IEnumerable<DeliveryConstraint> deliveryConstraints)
+        public static void Fill(this IBasicProperties properties, OutgoingMessage message, List<DeliveryConstraint> deliveryConstraints)
         {
             properties.MessageId = message.MessageId;
 
-            if (message.Headers.ContainsKey(Headers.CorrelationId))
+            if (message.Headers.ContainsKey(NServiceBus.Headers.CorrelationId))
             {
-                properties.CorrelationId = message.Headers[Headers.CorrelationId];
+                properties.CorrelationId = message.Headers[NServiceBus.Headers.CorrelationId];
             }
 
             DiscardIfNotReceivedBefore timeToBeReceived;
@@ -32,34 +31,63 @@
 
             properties.Headers = message.Headers.ToDictionary(p => p.Key, p => (object)p.Value);
 
-            if (message.Headers.ContainsKey(Headers.EnclosedMessageTypes))
+            string messageTypesHeader;
+            if (message.Headers.TryGetValue(NServiceBus.Headers.EnclosedMessageTypes, out messageTypesHeader))
             {
-                properties.Type = message.Headers[Headers.EnclosedMessageTypes].Split(new[]
+                var index = messageTypesHeader.IndexOf(',');
+
+                if (index > -1)
                 {
-                    ','
-                }, StringSplitOptions.RemoveEmptyEntries).FirstOrDefault();
+                    properties.Type = messageTypesHeader.Substring(0, index);
+                }
+                else
+                {
+                    properties.Type = messageTypesHeader;
+                }
             }
 
-            if (message.Headers.ContainsKey(Headers.ContentType))
+            if (message.Headers.ContainsKey(NServiceBus.Headers.ContentType))
             {
-                properties.ContentType = message.Headers[Headers.ContentType];
+                properties.ContentType = message.Headers[NServiceBus.Headers.ContentType];
             }
             else
             {
                 properties.ContentType = "application/octet-stream";
             }
 
-            if (message.Headers.ContainsKey(Headers.ReplyToAddress))
+            if (message.Headers.ContainsKey(NServiceBus.Headers.ReplyToAddress))
             {
-                properties.ReplyTo = message.Headers[Headers.ReplyToAddress];
+                properties.ReplyTo = message.Headers[NServiceBus.Headers.ReplyToAddress];
             }
         }
 
-        static bool TryGet<T>(IEnumerable<DeliveryConstraint> list, out T constraint) where T : DeliveryConstraint
+        public static void SetConfirmationId(this IBasicProperties properties, ulong confirmationId)
+        {
+            properties.Headers[confirmationIdHeader] = confirmationId.ToString();
+        }
+
+        public static bool TryGetConfirmationId(this IBasicProperties properties, out ulong confirmationId)
+        {
+            confirmationId = 0;
+
+            if (properties.Headers.ContainsKey(confirmationIdHeader))
+            {
+                var headerBytes = properties.Headers[confirmationIdHeader] as byte[];
+                var headerString = Encoding.UTF8.GetString(headerBytes ?? new byte[0]);
+
+                return UInt64.TryParse(headerString, out confirmationId);
+            }
+
+            return false;
+        }
+
+        static bool TryGet<T>(List<DeliveryConstraint> list, out T constraint) where T : DeliveryConstraint
         {
             constraint = list.OfType<T>().FirstOrDefault();
 
             return constraint != null;
         }
+
+        const string confirmationIdHeader = "NServiceBus.Transport.RabbitMQ.ConfirmationId";
     }
 }

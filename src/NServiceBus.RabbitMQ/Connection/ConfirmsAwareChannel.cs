@@ -1,62 +1,233 @@
-namespace NServiceBus.Transports.RabbitMQ
+namespace NServiceBus.Transport.RabbitMQ
 {
     using System;
-    using System.Text.RegularExpressions;
+    using System.Collections.Concurrent;
+    using System.Collections.Generic;
+    using System.Threading.Tasks;
     using global::RabbitMQ.Client;
-    using global::RabbitMQ.Client.Exceptions;
-    using Janitor;
-    using Unicast.Queuing;
+    using global::RabbitMQ.Client.Events;
+    using Logging;
 
-    [SkipWeaving]
     class ConfirmsAwareChannel : IDisposable
     {
-        public IModel Channel { get; }
-
-        public ConfirmsAwareChannel(IConnection connection, bool usePublisherConfirms, TimeSpan maxWaitTimeForConfirms)
+        public ConfirmsAwareChannel(IConnection connection, IRoutingTopology routingTopology, bool usePublisherConfirms)
         {
+            channel = connection.CreateModel();
+            channel.BasicReturn += Channel_BasicReturn;
+
+            this.routingTopology = routingTopology;
             this.usePublisherConfirms = usePublisherConfirms;
-            this.maxWaitTimeForConfirms = maxWaitTimeForConfirms;
-            Channel = connection.CreateModel();
 
             if (usePublisherConfirms)
             {
-                Channel.ConfirmSelect();
+                channel.ConfirmSelect();
+
+                channel.BasicAcks += Channel_BasicAcks;
+                channel.BasicNacks += Channel_BasicNacks;
+                channel.ModelShutdown += Channel_ModelShutdown;
+
+                messages = new ConcurrentDictionary<ulong, TaskCompletionSource<bool>>();
             }
+        }
+
+        public IBasicProperties CreateBasicProperties() => channel.CreateBasicProperties();
+
+        public bool IsOpen => channel.IsOpen;
+
+        public bool IsClosed => channel.IsClosed;
+
+        public Task SendMessage(string address, OutgoingMessage message, IBasicProperties properties)
+        {
+            Task task;
+
+            if (usePublisherConfirms)
+            {
+                task = GetConfirmationTask();
+                properties.SetConfirmationId(channel.NextPublishSeqNo);
+            }
+            else
+            {
+                task = TaskEx.CompletedTask;
+            }
+
+            routingTopology.Send(channel, address, message, properties);
+
+            return task;
+        }
+
+        public Task PublishMessage(Type type, OutgoingMessage message, IBasicProperties properties)
+        {
+            Task task;
+
+            if (usePublisherConfirms)
+            {
+                task = GetConfirmationTask();
+                properties.SetConfirmationId(channel.NextPublishSeqNo);
+            }
+            else
+            {
+                task = TaskEx.CompletedTask;
+            }
+
+            routingTopology.Publish(channel, type, message, properties);
+
+            return task;
+        }
+
+        public Task RawSendInCaseOfFailure(string address, byte[] body, IBasicProperties properties)
+        {
+            Task task;
+
+            if (usePublisherConfirms)
+            {
+                task = GetConfirmationTask();
+
+                if (properties.Headers == null)
+                {
+                    properties.Headers = new Dictionary<string, object>();
+                }
+
+                properties.SetConfirmationId(channel.NextPublishSeqNo);
+            }
+            else
+            {
+                task = TaskEx.CompletedTask;
+            }
+
+            routingTopology.RawSendInCaseOfFailure(channel, address, body, properties);
+
+            return task;
+        }
+
+        Task GetConfirmationTask()
+        {
+            var tcs = new TaskCompletionSource<bool>();
+            var added = messages.TryAdd(channel.NextPublishSeqNo, tcs);
+
+            if (!added) //debug check, this shouldn't happen
+            {
+                throw new Exception($"Failed to add {channel.NextPublishSeqNo}");
+            }
+
+            return tcs.Task;
+        }
+
+        class EventState
+        {
+            public ConcurrentDictionary<ulong, TaskCompletionSource<bool>> Messages { get; set; }
+
+            public bool Multiple { get; set; }
+
+            public ulong DeliveryTag { get; set; }
+        }
+
+        void Channel_BasicAcks(object sender, BasicAckEventArgs e)
+        {
+            TaskEx.StartNew(new EventState { Messages = messages, DeliveryTag = e.DeliveryTag, Multiple = e.Multiple }, state =>
+            {
+                var eventState = (EventState)state;
+
+                if (!eventState.Multiple)
+                {
+                    TaskCompletionSource<bool> tcs;
+                    eventState.Messages.TryRemove(eventState.DeliveryTag, out tcs);
+
+                    tcs?.SetResult(true);
+                }
+                else
+                {
+                    foreach (var message in eventState.Messages)
+                    {
+                        if (message.Key <= eventState.DeliveryTag)
+                        {
+                            TaskCompletionSource<bool> tcs;
+                            eventState.Messages.TryRemove(message.Key, out tcs);
+
+                            tcs?.SetResult(true);
+                        }
+                    }
+                }
+            });
+        }
+
+        void Channel_BasicNacks(object sender, BasicNackEventArgs e)
+        {
+            TaskEx.StartNew(new EventState { Messages = messages, DeliveryTag = e.DeliveryTag, Multiple = e.Multiple }, state =>
+            {
+                var eventState = (EventState)state;
+
+                if (!eventState.Multiple)
+                {
+                    TaskCompletionSource<bool> tcs;
+                    eventState.Messages.TryRemove(eventState.DeliveryTag, out tcs);
+
+                    tcs?.SetException(new Exception("Message rejected by broker."));
+                }
+                else
+                {
+                    foreach (var message in eventState.Messages)
+                    {
+                        if (message.Key <= eventState.DeliveryTag)
+                        {
+                            TaskCompletionSource<bool> tcs;
+                            eventState.Messages.TryRemove(message.Key, out tcs);
+
+                            tcs?.SetException(new Exception("Message rejected by broker."));
+                        }
+                    }
+                }
+            });
+        }
+
+        void Channel_BasicReturn(object sender, BasicReturnEventArgs e)
+        {
+            Task.Run(() =>
+            {
+                var message = $"Message could not be routed to {e.Exchange + e.RoutingKey}: {e.ReplyCode} {e.ReplyText}";
+
+                ulong deliveryTag;
+
+                if (e.BasicProperties.TryGetConfirmationId(out deliveryTag))
+                {
+                    TaskCompletionSource<bool> tcs;
+                    messages.TryRemove(deliveryTag, out tcs);
+
+                    tcs?.SetException(new Exception(message));
+                }
+                else
+                {
+                    Logger.Warn(message);
+                }
+            });
+        }
+
+        void Channel_ModelShutdown(object sender, ShutdownEventArgs e)
+        {
+            Task.Run(() =>
+            {
+                do
+                {
+                    foreach (var message in messages)
+                    {
+                        TaskCompletionSource<bool> tcs;
+                        messages.TryRemove(message.Key, out tcs);
+
+                        tcs?.SetException(new Exception($"Channel has been closed: {e}"));
+                    }
+                } while (!messages.IsEmpty);
+            });
         }
 
         public void Dispose()
         {
-            try
-            {
-                if (usePublisherConfirms)
-                {
-                    try
-                    {
-                        Channel.WaitForConfirmsOrDie(maxWaitTimeForConfirms);
-                    }
-                    catch (AlreadyClosedException ex)
-                    {
-                        if (ex.ShutdownReason != null && ex.ShutdownReason.ReplyCode == 404)
-                        {
-                            var msg = ex.ShutdownReason.ReplyText;
-                            var matches = Regex.Matches(msg, @"'([^' ]*)'");
-                            var exchangeName = matches.Count > 0 && matches[0].Groups.Count > 1 ? matches[0].Groups[1].Value : null;
-                            throw new QueueNotFoundException(exchangeName, "Exchange for the recipient does not exist", ex);
-                        }
-
-                        throw;
-                    }
-                }
-            }
-            finally
-            {
-                // After decompiling it looks like Abort is a safest method to call instead of Close/Dispose
-                // Close/Dispose throws exceptions if the channel is already closed!
-                Channel.Abort();
-            }
+            //injected
         }
 
+        IModel channel;
+        readonly IRoutingTopology routingTopology;
         readonly bool usePublisherConfirms;
-        readonly TimeSpan maxWaitTimeForConfirms;
+        readonly ConcurrentDictionary<ulong, TaskCompletionSource<bool>> messages;
+
+        static readonly ILog Logger = LogManager.GetLogger(typeof(ConfirmsAwareChannel));
     }
 }

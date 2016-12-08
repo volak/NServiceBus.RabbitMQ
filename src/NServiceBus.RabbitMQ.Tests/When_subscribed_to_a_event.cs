@@ -1,7 +1,7 @@
-﻿namespace NServiceBus.Transports.RabbitMQ.Tests
+﻿namespace NServiceBus.Transport.RabbitMQ.Tests
 {
     using System.Threading.Tasks;
-    using NServiceBus.Extensibility;
+    using Extensibility;
     using NUnit.Framework;
 
     [TestFixture]
@@ -141,7 +141,7 @@
             var type = typeof(T);
             var message = new OutgoingMessageBuilder().WithBody(new byte[0]).CorrelationId(type.FullName).PublishType(type).Build();
 
-            return messageDispatcher.Dispatch(message, new ContextBag());
+            return messageDispatcher.Dispatch(message, new TransportTransaction(), new ContextBag());
         }
 
         void AssertReceived<T>()

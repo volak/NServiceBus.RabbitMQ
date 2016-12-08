@@ -1,12 +1,12 @@
-﻿namespace NServiceBus.Transports.RabbitMQ.Tests
+﻿namespace NServiceBus.Transport.RabbitMQ.Tests
 {
     using System;
     using System.Collections;
     using System.Collections.Generic;
     using System.Text;
+    using global::RabbitMQ.Client.Events;
     using global::RabbitMQ.Client.Framing;
     using NUnit.Framework;
-    using global::RabbitMQ.Client.Events;
 
     [TestFixture]
     class MessageConverterTests
@@ -24,11 +24,56 @@
                 }
             };
 
-            var messageId = converter.RetrieveMessageId(message);
             var headers = converter.RetrieveHeaders(message);
+            var messageId = converter.RetrieveMessageId(message, headers);
 
             Assert.IsNotNull(messageId);
             Assert.IsNotNull(headers);
+        }
+
+        [Test]
+        public void Should_throw_exception_when_no_message_id_is_set()
+        {
+            var message = new BasicDeliverEventArgs
+            {
+                BasicProperties = new BasicProperties()
+            };
+
+            var headers = new Dictionary<string, string>();
+
+            Assert.Throws<InvalidOperationException>(() => converter.RetrieveMessageId(message, headers));
+        }
+
+        [Test]
+        public void Should_throw_exception_when_using_custom_strategy_and_no_message_id_is_returned()
+        {
+            var customConverter = new MessageConverter(args => "");
+
+            var message = new BasicDeliverEventArgs
+            {
+                BasicProperties = new BasicProperties()
+            };
+
+            var headers = new Dictionary<string, string>();
+
+            Assert.Throws<InvalidOperationException>(() => customConverter.RetrieveMessageId(message, headers));
+        }
+
+        [Test]
+        public void Should_fall_back_to_message_id_header_when_custom_strategy_returns_empty_string()
+        {
+            var customConverter = new MessageConverter(args => "");
+
+            var message = new BasicDeliverEventArgs
+            {
+                BasicProperties = new BasicProperties()
+            };
+
+            var headers = new Dictionary<string, string> { { Headers.MessageId, "Blah" } };
+
+            var messageId = customConverter.RetrieveMessageId(message, headers);
+
+            Assert.AreEqual(messageId, "Blah");
         }
 
         [Test]
@@ -53,7 +98,7 @@
         }
 
         [Test]
-        public void Should_set_replyto_header_if_present_in_native_message_and_not_already_set()
+        public void Should_set_replyto_header_if_native_replyto_is_present()
         {
             var message = new BasicDeliverEventArgs
             {
@@ -71,7 +116,7 @@
         }
 
         [Test]
-        public void Should_not_override_replyto_header_if_native_replyto_is_present()
+        public void Should_override_replyto_header_if_native_replyto_is_present()
         {
             var message = new BasicDeliverEventArgs
             {
@@ -89,7 +134,7 @@
             var headers = converter.RetrieveHeaders(message);
 
             Assert.NotNull(headers);
-            Assert.AreEqual("nsb set address", headers[Headers.ReplyToAddress]);
+            Assert.AreEqual("myaddress", headers[Headers.ReplyToAddress]);
         }
 
         [Test]

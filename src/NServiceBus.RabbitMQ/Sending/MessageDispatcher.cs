@@ -1,57 +1,65 @@
-﻿namespace NServiceBus.Transports.RabbitMQ
+﻿namespace NServiceBus.Transport.RabbitMQ
 {
+    using System.Collections.Generic;
     using System.Threading.Tasks;
-    using global::RabbitMQ.Client;
-    using NServiceBus.Extensibility;
-    using NServiceBus.Transports.RabbitMQ.Routing;
+    using Extensibility;
 
     class MessageDispatcher : IDispatchMessages
     {
         readonly IChannelProvider channelProvider;
-        readonly IRoutingTopology routingTopology;
 
-        public MessageDispatcher(IRoutingTopology routingTopology, IChannelProvider channelProvider)
+        public MessageDispatcher(IChannelProvider channelProvider)
         {
-            this.routingTopology = routingTopology;
             this.channelProvider = channelProvider;
         }
 
-        public Task Dispatch(TransportOperations operations, ContextBag context)
+        public Task Dispatch(TransportOperations outgoingMessages, TransportTransaction transaction, ContextBag context)
         {
-            using (var confirmsAwareChannel = channelProvider.GetNewPublishChannel())
+            var channel = channelProvider.GetPublishChannel();
+
+            try
             {
-                foreach (var unicastTransportOperation in operations.UnicastTransportOperations)
+                var unicastTransportOperations = outgoingMessages.UnicastTransportOperations;
+                var multicastTransportOperations = outgoingMessages.MulticastTransportOperations;
+
+                var tasks = new List<Task>(unicastTransportOperations.Count + multicastTransportOperations.Count);
+
+                foreach (var operation in unicastTransportOperations)
                 {
-                    SendMessage(unicastTransportOperation, confirmsAwareChannel.Channel);
+                    tasks.Add(SendMessage(operation, channel));
                 }
 
-                foreach (var multicastTransportOperation in operations.MulticastTransportOperations)
+                foreach (var operation in multicastTransportOperations)
                 {
-                    PublishMessage(multicastTransportOperation, confirmsAwareChannel.Channel);
+                    tasks.Add(PublishMessage(operation, channel));
                 }
+
+                return tasks.Count == 1 ? tasks[0] : Task.WhenAll(tasks);
             }
-
-            return TaskEx.CompletedTask;
+            finally
+            {
+                channelProvider.ReturnPublishChannel(channel);
+            }
         }
 
-        void SendMessage(UnicastTransportOperation transportOperation, IModel channel)
+        Task SendMessage(UnicastTransportOperation transportOperation, ConfirmsAwareChannel channel)
         {
             var message = transportOperation.Message;
 
             var properties = channel.CreateBasicProperties();
             properties.Fill(message, transportOperation.DeliveryConstraints);
 
-            routingTopology.Send(channel, transportOperation.Destination, message, properties);
+            return channel.SendMessage(transportOperation.Destination, message, properties);
         }
 
-        void PublishMessage(MulticastTransportOperation transportOperation, IModel channel)
+        Task PublishMessage(MulticastTransportOperation transportOperation, ConfirmsAwareChannel channel)
         {
             var message = transportOperation.Message;
 
             var properties = channel.CreateBasicProperties();
             properties.Fill(message, transportOperation.DeliveryConstraints);
 
-            routingTopology.Publish(channel, transportOperation.MessageType, message, properties);
+            return channel.PublishMessage(transportOperation.MessageType, message, properties);
         }
     }
 }

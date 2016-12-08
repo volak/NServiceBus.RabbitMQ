@@ -1,9 +1,8 @@
-﻿namespace NServiceBus.Transports.RabbitMQ
+﻿namespace NServiceBus.Transport.RabbitMQ
 {
     using System;
     using System.Collections;
     using System.Collections.Generic;
-    using System.Linq;
     using System.Text;
     using global::RabbitMQ.Client.Events;
     using Logging;
@@ -20,34 +19,27 @@
             this.messageIdStrategy = messageIdStrategy;
         }
 
-        public string RetrieveMessageId(BasicDeliverEventArgs message)
+        public string RetrieveMessageId(BasicDeliverEventArgs message, Dictionary<string, string> headers)
         {
-            return messageIdStrategy(message);
+            var messageId = messageIdStrategy(message);
+
+            if (string.IsNullOrWhiteSpace(messageId) && !headers.TryGetValue(Headers.MessageId, out messageId))
+            {
+                throw new InvalidOperationException("The message ID strategy did not provide a message ID, and the message does not have an 'NServiceBus.MessageId' header.");
+            }
+
+            return messageId;
         }
 
         public Dictionary<string, string> RetrieveHeaders(BasicDeliverEventArgs message)
         {
             var properties = message.BasicProperties;
 
-            var headers = DeserializeHeaders(message);
+            var headers = DeserializeHeaders(properties.Headers);
 
             if (properties.IsReplyToPresent())
             {
-                string replyToAddressNSBHeaders;
-                var nativeReplyToAddress = properties.ReplyTo;
-
-                if (headers.TryGetValue(Headers.ReplyToAddress, out replyToAddressNSBHeaders))
-                {
-                    if (replyToAddressNSBHeaders != nativeReplyToAddress)
-                    {
-                        Logger.WarnFormat("Missmatching replyto address properties found, the address specified by the NServiceBus headers '{1}' will override the native one '{0}'", nativeReplyToAddress, replyToAddressNSBHeaders);
-                    }
-                }
-                else
-                {
-                    //promote the native address
-                    headers[Headers.ReplyToAddress] = nativeReplyToAddress;
-                }
+                headers[Headers.ReplyToAddress] = properties.ReplyTo;
             }
 
             if (properties.IsCorrelationIdPresent())
@@ -66,6 +58,11 @@
                 headers[Headers.NonDurableMessage] = (properties.DeliveryMode == 1).ToString();
             }
 
+            if (headers.ContainsKey("NServiceBus.RabbitMQ.CallbackQueue"))
+            {
+                headers[Headers.ReplyToAddress] = headers["NServiceBus.RabbitMQ.CallbackQueue"];
+            }
+
             return headers;
         }
 
@@ -75,27 +72,28 @@
 
             if (!properties.IsMessageIdPresent() || string.IsNullOrWhiteSpace(properties.MessageId))
             {
-                throw new InvalidOperationException("A non empty message_id property is required when running NServiceBus on top of RabbitMq. If this is a interop message please make sure to set the message_id property before publishing the message");
+                throw new InvalidOperationException("A non-empty 'message-id' property is required when running NServiceBus on top of RabbitMQ. If this is an interop message, then set the 'message-id' property before publishing the message");
             }
 
             return properties.MessageId;
         }
 
-        static Dictionary<string, string> DeserializeHeaders(BasicDeliverEventArgs message)
+        static Dictionary<string, string> DeserializeHeaders(IDictionary<string, object> headers)
         {
-            if (message.BasicProperties.Headers == null)
+            var deserializedHeaders = new Dictionary<string, string>();
+
+            if (headers != null)
             {
-                return new Dictionary<string, string>();
+                var messageHeaders = headers as Dictionary<string, object>
+                    ?? new Dictionary<string, object>(headers);
+
+                foreach (var header in messageHeaders)
+                {
+                    deserializedHeaders.Add(header.Key, header.Value == null ? null : ValueToString(header.Value));
+                }
             }
 
-            return message.BasicProperties.Headers
-                .ToDictionary(
-                    dictionaryEntry => dictionaryEntry.Key,
-                    dictionaryEntry =>
-                    {
-                        var value = dictionaryEntry.Value;
-                        return dictionaryEntry.Value == null ? null : ValueToString(value);
-                    });
+            return deserializedHeaders;
         }
 
         static string ValueToString(object value)
@@ -112,25 +110,37 @@
                 return Encoding.UTF8.GetString(bytes);
             }
 
-            var objects = value as IDictionary<string, object>;
-            if (objects != null)
+            var dictionary = value as IDictionary<string, object>;
+            if (dictionary != null)
             {
-                var dict = objects;
-                return String.Join(",", dict.Select(kvp => kvp.Key + "=" + ValueToString(kvp.Value)));
+                var valuesToJoin = new List<string>();
+
+                // ReSharper disable once LoopCanBeConvertedToQuery
+                foreach (var kvp in dictionary)
+                {
+                    valuesToJoin.Add(string.Concat(kvp.Key, "=", ValueToString(kvp.Value)));
+                }
+
+                return string.Join(",", valuesToJoin);
             }
 
-            var list1 = value as IList;
-            if (list1 != null)
+            var list = value as IList;
+            if (list != null)
             {
-                var list = list1;
-                return String.Join(";", list.Cast<object>().Select(ValueToString));
+                var valuesToJoin = new List<string>();
+
+                foreach (var entry in list)
+                {
+                    valuesToJoin.Add(ValueToString(entry));
+                }
+
+                return string.Join(";", valuesToJoin);
             }
 
             return null;
         }
 
         readonly Func<BasicDeliverEventArgs, string> messageIdStrategy;
-
 
         static ILog Logger = LogManager.GetLogger(typeof(MessageConverter));
     }

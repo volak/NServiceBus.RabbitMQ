@@ -1,30 +1,31 @@
-﻿namespace NServiceBus.Transports.RabbitMQ.Config
+﻿namespace NServiceBus.Transport.RabbitMQ
 {
     using System;
     using System.ComponentModel;
     using System.Data.Common;
     using System.Linq;
     using System.Reflection;
-    using NServiceBus.Logging;
-    using NServiceBus.Settings;
+    using System.Text;
+    using Logging;
 
     class ConnectionStringParser : DbConnectionStringBuilder
     {
         static readonly ILog Logger = LogManager.GetLogger(typeof(ConnectionStringParser));
 
-        readonly ReadOnlySettings settings;
+        readonly string endpointName;
 
-        public ConnectionStringParser(ReadOnlySettings settings)
+        public ConnectionStringParser(string endpointName)
         {
-            this.settings = settings;
+            this.endpointName = endpointName;
         }
 
         public ConnectionConfiguration Parse(string connectionString)
         {
             ConnectionString = connectionString;
 
-            var connectionConfiguration = new ConnectionConfiguration(settings);
+            var connectionConfiguration = new ConnectionConfiguration(endpointName);
             var connectionConfigurationType = typeof(ConnectionConfiguration);
+            var invalidOptionsMessage = new StringBuilder();
 
             foreach (var key in Keys.Cast<string>())
             {
@@ -39,25 +40,36 @@
 
             if (ContainsKey("host"))
             {
-                ParseHosts(connectionConfiguration, this["host"] as string);
+                ParseHosts(connectionConfiguration, this["host"] as string, invalidOptionsMessage);
             }
             else
             {
-                throw new Exception("Invalid connection string. 'host' value must be supplied. e.g: \"host=myServer\"");
+                invalidOptionsMessage.AppendLine("Invalid connection string. 'host' value must be supplied. e.g: \"host=myServer\"");
             }
 
             if (ContainsKey("dequeuetimeout"))
             {
-                var message = "The 'DequeueTimeout' connection string option has been removed. Please consult the documentation for further information.";
+                invalidOptionsMessage.AppendLine("The 'DequeueTimeout' connection string option has been removed. Consult the documentation for further information.");
+            }
 
-                Logger.Error(message);
-
-                throw new NotSupportedException(message);
+            if (ContainsKey("maxwaittimeforconfirms"))
+            {
+                invalidOptionsMessage.AppendLine("The 'MaxWaitTimeForConfirms' connection string option has been removed. Consult the documentation for further information");
             }
 
             if (ContainsKey("prefetchcount"))
             {
-                var message = "The 'PrefetchCount' connection string option has been removed. Please use 'EndpointConfiguration.LimitMessageProcessingConcurrencyTo' instead.";
+                invalidOptionsMessage.AppendLine("The 'PrefetchCount' connection string option has been removed. Use 'EndpointConfiguration.UseTransport<RabbitMQTransport>().PrefetchCount' instead.");
+            }
+
+            if (ContainsKey("usepublisherconfirms"))
+            {
+                invalidOptionsMessage.AppendLine("The 'UsePublisherConfirms' connection string option has been removed. Use 'EndpointConfiguration.UseTransport<RabbitMQTransport>().UsePublisherConfirms' instead.");
+            }
+
+            if (invalidOptionsMessage.Length > 0)
+            {
+                var message = invalidOptionsMessage.ToString().TrimEnd('\r', '\n');
 
                 Logger.Error(message);
 
@@ -67,20 +79,15 @@
             return connectionConfiguration;
         }
 
-        void ParseHosts(ConnectionConfiguration connectionConfiguration, string hostsConnectionString)
+        void ParseHosts(ConnectionConfiguration connectionConfiguration, string hostsConnectionString, StringBuilder invalidOptionsMessage)
         {
             var hostsAndPorts = hostsConnectionString.Split(',');
 
             if (hostsAndPorts.Length > 1)
             {
-                var message =
-                    "Multiple hosts are no longer supported. " +
-                    "If you are using RabbitMQ in a cluster, " +
-                        "consider using a load balancer to represent the nodes as a single host.";
+                invalidOptionsMessage.AppendLine("Multiple hosts are no longer supported. If using RabbitMQ in a cluster, consider using a load balancer to represent the nodes as a single host.");
 
-                Logger.Error(message);
-
-                throw new NotSupportedException(message);
+                return;
             }
 
             var parts = hostsConnectionString.Split(':');

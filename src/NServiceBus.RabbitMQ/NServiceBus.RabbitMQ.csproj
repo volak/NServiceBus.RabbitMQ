@@ -8,7 +8,7 @@
     <ProjectGuid>{BA731749-22C7-4025-8A4D-465AE8E02E61}</ProjectGuid>
     <OutputType>Library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>NServiceBus.Transports.RabbitMQ</RootNamespace>
+    <RootNamespace>NServiceBus.Transport.RabbitMQ</RootNamespace>
     <AssemblyName>NServiceBus.Transports.RabbitMQ</AssemblyName>
     <TargetFrameworkVersion>v4.5.2</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
@@ -25,7 +25,7 @@
     <DebugType>full</DebugType>
     <Optimize>false</Optimize>
     <OutputPath>..\..\binaries\</OutputPath>
-    <DefineConstants>TRACE;DEBUG;CONCURRENT_COLLECTIONS</DefineConstants>
+    <DefineConstants>TRACE;DEBUG</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
     <DocumentationFile>..\..\binaries\NServiceBus.Transports.RabbitMQ.xml</DocumentationFile>
@@ -39,7 +39,7 @@
     <DebugType>pdbonly</DebugType>
     <Optimize>true</Optimize>
     <OutputPath>..\..\binaries\</OutputPath>
-    <DefineConstants>TRACE;CONCURRENT_COLLECTIONS</DefineConstants>
+    <DefineConstants>TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
     <DocumentationFile>..\..\binaries\NServiceBus.Transports.RabbitMQ.xml</DocumentationFile>
@@ -47,6 +47,7 @@
     </NoWarn>
     <UseVSHostingProcess>false</UseVSHostingProcess>
     <Prefer32Bit>false</Prefer32Bit>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="Janitor, Version=1.2.1.0, Culture=neutral, PublicKeyToken=d34c7d3bba3746e6, processorArchitecture=MSIL">
@@ -55,7 +56,7 @@
     </Reference>
     <Reference Include="Microsoft.CSharp" />
     <Reference Include="NServiceBus.Core, Version=6.0.0.0, Culture=neutral, PublicKeyToken=9fc386479f8a226c, processorArchitecture=MSIL">
-      <HintPath>..\packages\NServiceBus.6.0.0-unstable1616\lib\net452\NServiceBus.Core.dll</HintPath>
+      <HintPath>..\packages\NServiceBus.6.0.0\lib\net452\NServiceBus.Core.dll</HintPath>
       <Private>True</Private>
     </Reference>
     <Reference Include="Obsolete, Version=4.1.0.0, Culture=neutral, PublicKeyToken=1ca091877d12ca03, processorArchitecture=MSIL">
@@ -76,26 +77,24 @@
     <Compile Include="Configuration\ObsoleteAppSettings.cs" />
     <Compile Include="Configuration\ConnectionStringParser.cs" />
     <Compile Include="RabbitMQTransport.cs" />
-    <Compile Include="RabbitMQTransportSettingsExtensions.cs" />
+    <Compile Include="Configuration\RabbitMQTransportSettingsExtensions.cs" />
     <Compile Include="RabbitMQTransportInfrastructure.cs" />
     <Compile Include="Configuration\SettingsKeys.cs" />
     <Compile Include="Connection\ConfirmsAwareChannel.cs" />
+    <Compile Include="Receiving\ModelExtensions.cs" />
     <Compile Include="Routing\DefaultRoutingKeyConvention.cs" />
     <Compile Include="Configuration\ConnectionConfiguration.cs" />
-    <Compile Include="Connection\RabbitMqConnectionFactory.cs" />
+    <Compile Include="Connection\ConnectionFactory.cs" />
     <Compile Include="Connection\IChannelProvider.cs" />
     <Compile Include="InternalsVisibleTo.cs" />
-    <Compile Include="LegacyCallbacks\LegacyCallbacksFeature.cs" />
     <Compile Include="Receiving\MessagePump.cs" />
-    <Compile Include="LegacyCallbacks\OverrideOutgoingReplyAddressIfLegacyCallbackAddressExistsBehavior.cs" />
     <Compile Include="obsoletes.cs" />
-    <Compile Include="Receiving\PoisonMessageForwarder.cs" />
-    <Compile Include="Receiving\QueuePurger.cs" />
-    <Compile Include="Connection\ConnectionManager.cs" />
+    <Compile Include="Administration\QueuePurger.cs" />
     <Compile Include="AssemblyInfo.cs" />
+    <Compile Include="Routing\IDeclareQueues.cs" />
     <Compile Include="Sending\MessageDispatcher.cs" />
-    <Compile Include="Receiving\QueueCreator.cs" />
-    <Compile Include="Receiving\SubscriptionManager.cs" />
+    <Compile Include="Administration\QueueCreator.cs" />
+    <Compile Include="Administration\SubscriptionManager.cs" />
     <Compile Include="Receiving\MessageConverter.cs" />
     <Compile Include="Sending\BasicPropertiesExtensions.cs" />
     <Compile Include="Receiving\MessagePumpConnectionFailedCircuitBreaker.cs" />
@@ -130,4 +129,9 @@
   <Import Project="..\packages\Fody.1.29.4\build\dotnet\Fody.targets" Condition="Exists('..\packages\Fody.1.29.4\build\dotnet\Fody.targets')" />
   <Import Project="..\packages\NuGetPackager.0.6.0\build\NuGetPackager.targets" Condition="Exists('..\packages\NuGetPackager.0.6.0\build\NuGetPackager.targets')" />
   <Import Project="..\packages\GitVersionTask.3.6.5\build\dotnet\GitVersionTask.targets" Condition="Exists('..\packages\GitVersionTask.3.6.5\build\dotnet\GitVersionTask.targets')" />
+    <Error Condition="!Exists('..\packages\GitVersionTask.3.6.4\build\dotnet\GitVersionTask.targets')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\GitVersionTask.3.6.4\build\dotnet\GitVersionTask.targets'))" />
+  </Target>
+  <Import Project="..\packages\Fody.1.29.4\build\dotnet\Fody.targets" Condition="Exists('..\packages\Fody.1.29.4\build\dotnet\Fody.targets')" />
+  <Import Project="..\packages\NuGetPackager.0.6.0\build\NuGetPackager.targets" Condition="Exists('..\packages\NuGetPackager.0.6.0\build\NuGetPackager.targets')" />
+  <Import Project="..\packages\GitVersionTask.3.6.4\build\dotnet\GitVersionTask.targets" Condition="Exists('..\packages\GitVersionTask.3.6.4\build\dotnet\GitVersionTask.targets')" />
 </Project>

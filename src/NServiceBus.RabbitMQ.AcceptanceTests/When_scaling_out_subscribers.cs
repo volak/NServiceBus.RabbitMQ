@@ -1,8 +1,8 @@
-﻿namespace NServiceBus.RabbitMQ.AcceptanceTests
+﻿namespace NServiceBus.Transport.RabbitMQ.AcceptanceTests
 {
     using System;
     using System.Threading.Tasks;
-    using NServiceBus.AcceptanceTesting;
+    using AcceptanceTesting;
     using NServiceBus.AcceptanceTests;
     using NServiceBus.AcceptanceTests.EndpointTemplates;
     using NUnit.Framework;
@@ -16,7 +16,7 @@
                    .WithEndpoint<Publisher>(b => b.When(c => c.ServerASubscribed && c.ServerBSubscribed, bus => bus.Publish<MyEvent>()))
                    .WithEndpoint<ScaledOutSubscriber>(b =>
                    {
-                       b.CustomConfig(c => c.ScaleOut().InstanceDiscriminator("A"));
+                       b.CustomConfig(c => c.MakeInstanceUniquelyAddressable("A"));
                        b.When(async (bus, c) =>
                        {
                            await bus.Subscribe<MyEvent>();
@@ -25,7 +25,7 @@
                    })
                    .WithEndpoint<ScaledOutSubscriber>(b =>
                    {
-                       b.CustomConfig(c => c.ScaleOut().InstanceDiscriminator("B"));
+                       b.CustomConfig(c => c.MakeInstanceUniquelyAddressable("B"));
                        b.When(async (bus, c) =>
                        {
                            await bus.Subscribe<MyEvent>();

@@ -1,23 +1,63 @@
-namespace NServiceBus.Transports.RabbitMQ
+namespace NServiceBus.Transport.RabbitMQ
 {
     using System;
+    using System.Collections.Concurrent;
+    using global::RabbitMQ.Client;
 
-    class ChannelProvider : IChannelProvider
+    class ChannelProvider : IChannelProvider, IDisposable
     {
-        public ChannelProvider(ConnectionManager connectionManager, bool usePublisherConfirms, TimeSpan maxWaitTimeForConfirms)
+        public ChannelProvider(ConnectionFactory connectionFactory, IRoutingTopology routingTopology, bool usePublisherConfirms)
         {
-            this.connectionManager = connectionManager;
+            connection = new Lazy<IConnection>(() => connectionFactory.CreatePublishConnection());
+
+            this.routingTopology = routingTopology;
             this.usePublisherConfirms = usePublisherConfirms;
-            this.maxWaitTimeForConfirms = maxWaitTimeForConfirms;
+
+            channels = new ConcurrentQueue<ConfirmsAwareChannel>();
         }
 
-        public ConfirmsAwareChannel GetNewPublishChannel()
+        public ConfirmsAwareChannel GetPublishChannel()
         {
-            return new ConfirmsAwareChannel(connectionManager.GetPublishConnection(), usePublisherConfirms, maxWaitTimeForConfirms);
+            ConfirmsAwareChannel channel;
+
+            if (!channels.TryDequeue(out channel) || channel.IsClosed)
+            {
+                channel?.Dispose();
+
+                channel = new ConfirmsAwareChannel(connection.Value, routingTopology, usePublisherConfirms);
+            }
+
+            return channel;
         }
 
-        ConnectionManager connectionManager;
-        bool usePublisherConfirms;
-        TimeSpan maxWaitTimeForConfirms;
+        public void ReturnPublishChannel(ConfirmsAwareChannel channel)
+        {
+            if (channel.IsOpen)
+            {
+                channels.Enqueue(channel);
+            }
+            else
+            {
+                channel.Dispose();
+            }
+        }
+
+        public void Dispose()
+        {
+            //injected
+        }
+
+        void DisposeManaged()
+        {
+            if (connection.IsValueCreated)
+            {
+                connection.Value.Dispose();
+            }
+        }
+
+        readonly Lazy<IConnection> connection;
+        readonly IRoutingTopology routingTopology;
+        readonly bool usePublisherConfirms;
+        readonly ConcurrentQueue<ConfirmsAwareChannel> channels;
     }
 }

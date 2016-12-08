@@ -1,19 +1,16 @@
-﻿namespace NServiceBus.Transports.RabbitMQ.Tests
+﻿namespace NServiceBus.Transport.RabbitMQ.Tests
 {
     using System;
     using System.Collections.Concurrent;
     using System.Diagnostics;
-    using NServiceBus.Settings;
-    using NServiceBus.Transports.RabbitMQ.Config;
-    using NServiceBus.Transports.RabbitMQ.Connection;
-    using NServiceBus.Transports.RabbitMQ.Routing;
+    using System.Threading.Tasks;
     using NUnit.Framework;
 
     class RabbitMqContext
     {
         protected void MakeSureQueueAndExchangeExists(string queueName)
         {
-            using (var connection = connectionManager.CreateAdministrationConnection())
+            using (var connection = connectionFactory.CreateAdministrationConnection())
             using (var channel = connection.CreateModel())
             {
                 channel.QueueDeclare(queueName, true, false, false, null);
@@ -28,12 +25,12 @@
 
         void DeleteExchange(string exchangeName)
         {
-            using (var connection = connectionManager.CreateAdministrationConnection())
+            using (var connection = connectionFactory.CreateAdministrationConnection())
             using (var channel = connection.CreateModel())
             {
                 try
                 {
-                    channel.ExchangeDelete(exchangeName);
+                    channel.ExchangeDelete(exchangeName, false);
                 }
                 // ReSharper disable EmptyGeneralCatchClause
                 catch (Exception)
@@ -51,46 +48,44 @@
             routingTopology = new ConventionalRoutingTopology(true);
             receivedMessages = new BlockingCollection<IncomingMessage>();
 
-            var settings = new SettingsHolder();
-            settings.Set<NServiceBus.Routing.EndpointName>(new NServiceBus.Routing.EndpointName(ReceiverQueue));
-
             var connectionString = Environment.GetEnvironmentVariable("RabbitMQTransport.ConnectionString");
 
             ConnectionConfiguration config;
 
             if (connectionString != null)
             {
-                var parser = new ConnectionStringParser(settings);
+                var parser = new ConnectionStringParser(ReceiverQueue);
                 config = parser.Parse(connectionString);
             }
             else
             {
-                config = new ConnectionConfiguration(settings);
+                config = new ConnectionConfiguration(ReceiverQueue);
                 config.Host = "localhost";
+                config.VirtualHost = "nsb-rabbitmq-test";
             }
 
-            connectionFactory = new RabbitMqConnectionFactory(config);
-            connectionManager = new ConnectionManager(connectionFactory);
-            var channelProvider = new ChannelProvider(connectionManager, config.UsePublisherConfirms, config.MaxWaitTimeForConfirms);
+            connectionFactory = new ConnectionFactory(config);
+            channelProvider = new ChannelProvider(connectionFactory, routingTopology, true);
 
-            messageDispatcher = new MessageDispatcher(routingTopology, channelProvider);
+            messageDispatcher = new MessageDispatcher(channelProvider);
 
-            var purger = new QueuePurger(connectionManager);
-            var poisonMessageForwarder = new PoisonMessageForwarder(channelProvider, routingTopology);
+            var purger = new QueuePurger(connectionFactory);
 
-            messagePump = new MessagePump(config, new MessageConverter(), "Unit test", poisonMessageForwarder, purger, TimeSpan.FromMinutes(2));
+            messagePump = new MessagePump(connectionFactory, new MessageConverter(), "Unit test", channelProvider, purger, TimeSpan.FromMinutes(2), 3, 0);
 
             MakeSureQueueAndExchangeExists(ReceiverQueue);
+            MakeSureQueueAndExchangeExists(ErrorQueue);
 
-            subscriptionManager = new SubscriptionManager(connectionManager, routingTopology, ReceiverQueue);
+            subscriptionManager = new SubscriptionManager(connectionFactory, routingTopology, ReceiverQueue);
 
-            messagePump.Init(pushContext =>
+            messagePump.Init(messageContext =>
             {
-                receivedMessages.Add(new IncomingMessage(pushContext.MessageId, pushContext.Headers, pushContext.BodyStream));
+                receivedMessages.Add(new IncomingMessage(messageContext.MessageId, messageContext.Headers, messageContext.Body));
                 return TaskEx.CompletedTask;
             },
+                ErrorContext => Task.FromResult(ErrorHandleResult.Handled),
                 new CriticalError(_ => TaskEx.CompletedTask),
-                new PushSettings(ReceiverQueue, "error", true, TransportTransactionMode.ReceiveOnly)
+                new PushSettings(ReceiverQueue, ErrorQueue, true, TransportTransactionMode.ReceiveOnly)
             ).GetAwaiter().GetResult();
 
             messagePump.Start(new PushRuntimeSettings(MaximumConcurrency));
@@ -101,7 +96,7 @@
         {
             messagePump?.Stop().GetAwaiter().GetResult();
 
-            connectionManager?.Dispose();
+            channelProvider?.Dispose();
         }
 
         protected IncomingMessage WaitForMessage()
@@ -120,9 +115,10 @@
         }
 
         protected const string ReceiverQueue = "testreceiver";
+        protected const string ErrorQueue = "error";
         protected MessageDispatcher messageDispatcher;
-        protected RabbitMqConnectionFactory connectionFactory;
-        protected ConnectionManager connectionManager;
+        protected ConnectionFactory connectionFactory;
+        private ChannelProvider channelProvider;
         protected MessagePump messagePump;
         BlockingCollection<IncomingMessage> receivedMessages;
 

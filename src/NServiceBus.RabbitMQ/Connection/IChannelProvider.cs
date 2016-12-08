@@ -1,7 +1,9 @@
-﻿namespace NServiceBus.Transports.RabbitMQ
+﻿namespace NServiceBus.Transport.RabbitMQ
 {
     interface IChannelProvider
     {
-        ConfirmsAwareChannel GetNewPublishChannel();
+        ConfirmsAwareChannel GetPublishChannel();
+
+        void ReturnPublishChannel(ConfirmsAwareChannel channel);
     }
 }

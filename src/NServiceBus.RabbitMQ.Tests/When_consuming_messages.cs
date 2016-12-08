@@ -1,13 +1,11 @@
-﻿namespace NServiceBus.Transports.RabbitMQ.Tests
+﻿namespace NServiceBus.Transport.RabbitMQ.Tests
 {
     using System;
     using System.Collections.Generic;
     using System.Threading.Tasks;
-    using NServiceBus.Extensibility;
-    using NServiceBus.Routing;
+    using Extensibility;
     using NUnit.Framework;
-
-    using Headers = NServiceBus.Headers;
+    using Routing;
 
     [TestFixture]
     class When_consuming_messages : RabbitMqContext
@@ -18,7 +16,7 @@
             var message = new OutgoingMessage(Guid.NewGuid().ToString(), new Dictionary<string, string>(), new byte[0]);
             var transportOperations = new TransportOperations(new TransportOperation(message, new UnicastAddressTag(ReceiverQueue)));
 
-            await messageDispatcher.Dispatch(transportOperations, new ContextBag());
+            await messageDispatcher.Dispatch(transportOperations, new TransportTransaction(), new ContextBag());
 
             var received = WaitForMessage();
 
@@ -30,7 +28,8 @@
         {
             var message = new OutgoingMessage(Guid.NewGuid().ToString(), new Dictionary<string, string>(), new byte[0]);
 
-            using (var channel = connectionManager.GetPublishConnection().CreateModel())
+            using (var connection = connectionFactory.CreatePublishConnection())
+            using (var channel = connection.CreateModel())
             {
                 var properties = channel.CreateBasicProperties();
 
@@ -45,22 +44,24 @@
         }
 
         [Test]
-        public void Should_be_able_to_receive_a_blank_message()
+        public void Should_move_message_without_message_id_to_error_queue()
         {
             var message = new OutgoingMessage(Guid.NewGuid().ToString(), new Dictionary<string, string>(), new byte[0]);
 
-            using (var channel = connectionManager.GetPublishConnection().CreateModel())
+            using (var connection = connectionFactory.CreatePublishConnection())
+            using (var channel = connection.CreateModel())
             {
                 var properties = channel.CreateBasicProperties();
 
-                properties.MessageId = message.MessageId;
-
                 channel.BasicPublish(string.Empty, ReceiverQueue, false, properties, message.Body);
+
+                var received = WaitForMessage();
+
+                var result = channel.BasicGet(ErrorQueue, true);
+
+                Assert.Null(received, "Message should not be processed processed successfully.");
+                Assert.NotNull(result, "Message should be considered poison and moved to the error queue.");
             }
-
-            var received = WaitForMessage();
-
-            Assert.NotNull(received.MessageId, "The message id should be defaulted to a new guid if not set");
         }
 
         [Test]
@@ -70,7 +71,8 @@
 
             var typeName = typeof(MyMessage).FullName;
 
-            using (var channel = connectionManager.GetPublishConnection().CreateModel())
+            using (var connection = connectionFactory.CreatePublishConnection())
+            using (var channel = connection.CreateModel())
             {
                 var properties = channel.CreateBasicProperties();
 
