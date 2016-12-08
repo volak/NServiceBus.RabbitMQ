@@ -3,7 +3,6 @@
     using System;
     using RabbitMqNext;
     using System.Threading.Tasks;
-    using global::RabbitMQ.Client;
 
     class QueueCreator : ICreateQueues
     {
@@ -20,25 +19,25 @@
 
         public async Task CreateQueueIfNecessary(QueueBindings queueBindings, string identity)
         {
-            using (var connection = connectionFactory.CreateAdministrationConnection())
-            using (var channel = connection.CreateModel())
+            using (var connection = await connectionFactory.CreateAdministrationConnection().ConfigureAwait(false))
+            using (var channel = await connection.CreateChannel().ConfigureAwait(false))
             {
                 var queueDeclaringTopology = routingTopology as IDeclareQueues;
 
                 if (queueDeclaringTopology != null)
                 {
-                    queueDeclaringTopology.DeclareAndInitialize(channel, queueBindings.ReceivingAddresses, queueBindings.SendingAddresses);
+                    await queueDeclaringTopology.DeclareAndInitialize(channel, queueBindings.ReceivingAddresses, queueBindings.SendingAddresses).ConfigureAwait(false);
                 }
                 else
                 {
                     foreach (var receivingAddress in queueBindings.ReceivingAddresses)
                     {
-                		await CreateQueueIfNecessary(channel, receivingAddress);
+                		await CreateQueueIfNecessary(channel, receivingAddress).ConfigureAwait(false);
                     }
 
                     foreach (var sendingAddress in queueBindings.SendingAddresses)
                     {
-                		await CreateQueueIfNecessary(channel, sendingAddress);
+                		await CreateQueueIfNecessary(channel, sendingAddress).ConfigureAwait(false);
                     }
                 }
             }

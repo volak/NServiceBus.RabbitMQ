@@ -1,13 +1,14 @@
 ﻿namespace NServiceBus.Transport.RabbitMQ
 {
     using System.Collections.Generic;
-    using global::RabbitMQ.Client;
+    using System.Threading.Tasks;
+    using RabbitMqNext;
 
     /// <summary>
     /// An extension for <see cref="IRoutingTopology"/> implementations which allows
     /// control over the declaration of queues as well as other initialization.
-    /// The <see cref="DeclareAndInitialize(IModel, IEnumerable{string}, IEnumerable{string})"/> method will be called
-    /// on all implementations instead of the <see cref="IRoutingTopology.Initialize(IModel, string)"/> method.
+    /// The <see cref="DeclareAndInitialize(IChannel, IEnumerable{string}, IEnumerable{string})"/> method will be called
+    /// on all implementations instead of the <see cref="IRoutingTopology.Initialize(IChannel, string)"/> method.
     /// </summary>
     public interface IDeclareQueues
     {
@@ -21,6 +22,6 @@
         /// <param name="sendingAddresses">
         /// The addresses of the queues to declare and perform initialization for, that this endpoint is sending to.
         /// </param>
-        void DeclareAndInitialize(IModel channel, IEnumerable<string> receivingAddresses, IEnumerable<string> sendingAddresses);
+        Task DeclareAndInitialize(IChannel channel, IEnumerable<string> receivingAddresses, IEnumerable<string> sendingAddresses);
     }
 }

@@ -1,6 +1,8 @@
 ﻿namespace NServiceBus.Transport.RabbitMQ
 {
     using System;
+    using System.Collections.Generic;
+    using System.Linq;
     using global::RabbitMqNext;
     using System.Threading.Tasks;
 
@@ -55,15 +57,7 @@
         {
             foreach (var address in receivingAddresses.Concat(sendingAddresses))
             {
-                channel.QueueDeclare(address, useDurableExchanges, false, false, null);
-            }
-        }
-
-        public void DeclareAndInitialize(IModel channel, IEnumerable<string> receivingAddresses, IEnumerable<string> sendingAddresses)
-        {
-            foreach (var address in receivingAddresses.Concat(sendingAddresses))
-            {
-                channel.QueueDeclare(address, useDurableExchanges, false, false, null);
+                await channel.QueueDeclare(address, useDurableExchanges, false, false, false, null, true).ConfigureAwait(false);
             }
         }
 

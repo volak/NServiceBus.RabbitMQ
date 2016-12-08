@@ -32,14 +32,18 @@
 
             this.settings = settings;
             var connectionConfiguration = new ConnectionStringParser(settings.EndpointName()).Parse(connectionString);
-			connectionFactory = new ConnectionFactory(connectionConfiguration);
+			connectionFactory = new ConnectionFactory(settings, connectionConfiguration);
 
-            CreateTopology();
-            
+            routingTopology = CreateRoutingTopology();
+
+            bool usePublisherConfirms;
+            if (!settings.TryGet(SettingsKeys.UsePublisherConfirms, out usePublisherConfirms))
+            {
+                usePublisherConfirms = true;
+            }
 
             connectionFactory = new ConnectionFactory(settings, connectionConfiguration);
-            
-            channelProvider = new ChannelProvider(connectionFactory, routingTopology, connectionConfiguration.publisherConfirms);
+            channelProvider = new ChannelProvider(connectionFactory, routingTopology, usePublisherConfirms);
 
             RequireOutboxConsent = false;
         }
@@ -108,29 +112,17 @@
         {
             channelProvider.Dispose();
         }
-
-		void CreateTopology()
+        IRoutingTopology CreateRoutingTopology()
         {
-            if (settings.HasSetting<IRoutingTopology>())
-            {
-                routingTopology = settings.Get<IRoutingTopology>();
-            }
-            else
-            {
-                var durable = settings.DurableMessagesEnabled();
+            var durable = settings.DurableMessagesEnabled();
+            Func<bool, IRoutingTopology> topologyFactory;
 
-                DirectRoutingTopology.Conventions conventions;
-
-                if (settings.TryGet(out conventions))
-                {
-                    routingTopology = new DirectRoutingTopology(conventions, durable);
-                }
-                else
-                {
-                    routingTopology = new ConventionalRoutingTopology(durable);
-                }
+            if (!settings.TryGet(out topologyFactory))
+            {
+                topologyFactory = d => new ConventionalRoutingTopology(d);
             }
-            Logger.Debug($"Using routing topology {routingTopology.GetType().Name}");
+
+            return topologyFactory(durable);
         }
 
 

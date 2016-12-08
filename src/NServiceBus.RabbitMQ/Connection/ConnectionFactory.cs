@@ -2,8 +2,6 @@
 namespace NServiceBus.Transport.RabbitMQ
 {
     using System;
-    using System.Collections.Generic;
-    using System.Linq;
     using System.Threading.Tasks;
     using global::RabbitMqNext;
     using Settings;

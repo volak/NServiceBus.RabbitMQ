@@ -2,7 +2,11 @@
 {
     using System;
     using System.Collections.Concurrent;
-    using global::RabbitMQ.Client;
+    using System.Collections.Generic;
+    using System.Linq;
+    using System.Threading.Tasks;
+    using RabbitMqNext;
+    using NServiceBus.Logging;
 
     /// <summary>
     /// Implements the RabbitMQ routing topology as described at http://codebetter.com/drusellers/2011/05/08/brain-dump-conventional-routing-in-rabbitmq/
@@ -80,12 +84,12 @@
                 await channel.BasicPublish(address, String.Empty, true, properties, body).ConfigureAwait(false);
         }
 
-        public void DeclareAndInitialize(IModel channel, IEnumerable<string> receivingAddresses, IEnumerable<string> sendingAddresses)
+        public async Task DeclareAndInitialize(IChannel channel, IEnumerable<string> receivingAddresses, IEnumerable<string> sendingAddresses)
         {
             foreach (var address in receivingAddresses.Concat(sendingAddresses))
             {
-                channel.QueueDeclare(address, useDurableExchanges, false, false, null);
-                Initialize(channel, address);
+                await channel.QueueDeclare(address, useDurableExchanges, false, false, false, null, true).ConfigureAwait(false);
+                await Initialize(channel, address).ConfigureAwait(false);
             }
         }
 
