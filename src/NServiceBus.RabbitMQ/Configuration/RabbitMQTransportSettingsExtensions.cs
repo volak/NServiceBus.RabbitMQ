@@ -2,8 +2,8 @@
 {
     using System;
     using Configuration.AdvanceExtensibility;
-    using RabbitMQ.Client.Events;
     using Transport.RabbitMQ;
+    using RabbitMqNext;
 
     /// <summary>
     /// Adds access to the RabbitMQ transport config to the global Transports object.
@@ -60,7 +60,7 @@
         /// <param name="transportExtensions"></param>
         /// <param name="customIdStrategy">The user-defined strategy for giving the message a unique ID.</param>
         /// <returns></returns>
-        public static TransportExtensions<RabbitMQTransport> CustomMessageIdStrategy(this TransportExtensions<RabbitMQTransport> transportExtensions, Func<BasicDeliverEventArgs, string> customIdStrategy)
+        public static TransportExtensions<RabbitMQTransport> CustomMessageIdStrategy(this TransportExtensions<RabbitMQTransport> transportExtensions, Func<MessageDelivery, string> customIdStrategy)
         {
             transportExtensions.GetSettings().Set(SettingsKeys.CustomMessageIdStrategy, customIdStrategy);
             return transportExtensions;
@@ -115,5 +115,6 @@
             transportExtensions.GetSettings().Set(SettingsKeys.PrefetchCount, prefetchCount);
             return transportExtensions;
         }
+        
     }
 }

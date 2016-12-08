@@ -5,13 +5,13 @@
     using System.Globalization;
     using System.Linq;
     using System.Text;
-    using global::RabbitMQ.Client;
+    using global::RabbitMqNext;
     using DeliveryConstraints;
     using Performance.TimeToBeReceived;
 
     static class BasicPropertiesExtensions
     {
-        public static void Fill(this IBasicProperties properties, OutgoingMessage message, List<DeliveryConstraint> deliveryConstraints)
+        public static void Fill(this BasicProperties properties, OutgoingMessage message, List<DeliveryConstraint> deliveryConstraints)
         {
             properties.MessageId = message.MessageId;
 
@@ -27,9 +27,17 @@
                 properties.Expiration = timeToBeReceived.MaxTime.TotalMilliseconds.ToString(CultureInfo.InvariantCulture);
             }
 
-            properties.Persistent = !deliveryConstraints.Any(c => c is NonDurableDelivery);
-
-            properties.Headers = message.Headers.ToDictionary(p => p.Key, p => (object)p.Value);
+            if(deliveryConstraints.Any(c => c is NonDurableDelivery))
+            {
+                properties.DeliveryMode = 0x1;
+            }
+            else
+            {
+                properties.DeliveryMode = 0x2;
+            }
+            
+            foreach(var header in message.Headers)
+                properties.Headers[header.Key] = header.Value;
 
             string messageTypesHeader;
             if (message.Headers.TryGetValue(NServiceBus.Headers.EnclosedMessageTypes, out messageTypesHeader))
@@ -61,12 +69,12 @@
             }
         }
 
-        public static void SetConfirmationId(this IBasicProperties properties, ulong confirmationId)
+        public static void SetConfirmationId(this BasicProperties properties, ulong confirmationId)
         {
             properties.Headers[confirmationIdHeader] = confirmationId.ToString();
         }
 
-        public static bool TryGetConfirmationId(this IBasicProperties properties, out ulong confirmationId)
+        public static bool TryGetConfirmationId(this BasicProperties properties, out ulong confirmationId)
         {
             confirmationId = 0;
 

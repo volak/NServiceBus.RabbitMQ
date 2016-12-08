@@ -5,10 +5,12 @@ using NServiceBus;
 using NServiceBus.Settings;
 using NServiceBus.TransportTests;
 using NServiceBus.Transport;
-using RabbitMQ.Client;
+using System.Text.RegularExpressions;
+using RabbitMqNext;
 
 class ConfigureRabbitMQTransportInfrastructure : IConfigureTransportInfrastructure
 {
+
     public TransportConfigurationResult Configure(SettingsHolder settings, TransportTransactionMode transactionMode)
     {
         var result = new TransportConfigurationResult();
@@ -43,40 +45,38 @@ class ConfigureRabbitMQTransportInfrastructure : IConfigureTransportInfrastructu
         }
     }
 
-    public Task Cleanup()
+    public async Task Cleanup()
     {
         if (transportTransactionMode >= requestedTransactionMode)
         {
-            PurgeQueues();
+            await PurgeQueues();
         }
-
-        return Task.FromResult(0);
     }
 
-    void PurgeQueues()
+    async Task PurgeQueues()
     {
         var connectionFactory = CreateConnectionFactory();
 
-        using (var connection = connectionFactory.CreateConnection("Test Queue Purger"))
-        using (var channel = connection.CreateModel())
+        using (var connection = await connectionFactory("Test Queue Purger"))
+        using (var channel = await connection.CreateChannelWithPublishConfirmation())
         {
             foreach (var queue in queueBindings.ReceivingAddresses)
             {
-                PurgeQueue(channel, queue);
+                await PurgeQueue(channel, queue);
             }
 
             foreach (var queue in queueBindings.SendingAddresses)
             {
-                PurgeQueue(channel, queue);
+                await PurgeQueue(channel, queue);
             }
         }
     }
 
-    static void PurgeQueue(IModel channel, string queue)
+    static async Task PurgeQueue(IChannel channel, string queue)
     {
         try
         {
-            channel.QueuePurge(queue);
+            await channel.QueuePurge(queue, true);
         }
         catch (Exception ex)
         {
@@ -84,22 +84,32 @@ class ConfigureRabbitMQTransportInfrastructure : IConfigureTransportInfrastructu
         }
     }
 
-    ConnectionFactory CreateConnectionFactory()
+    Func<String, Task<IConnection>> CreateConnectionFactory()
     {
-        var connectionFactory = new ConnectionFactory
-        {
-            UserName = connectionStringBuilder["username"].ToString(),
-            Password = connectionStringBuilder["password"].ToString(),
-            VirtualHost = connectionStringBuilder["virtualhost"].ToString(),
-            HostName = connectionStringBuilder["host"].ToString(),
-            AutomaticRecoveryEnabled = true,
-            UseBackgroundThreadsForIO = true
-        };
+        var match = Regex.Match(connectionString, string.Format("[^\\w]*{0}=(?<{0}>[^;]+)", "host"), RegexOptions.IgnoreCase);
 
-        return connectionFactory;
+        username = match.Groups["UserName"].Success ? match.Groups["UserName"].Value : "guest";
+        password = match.Groups["Password"].Success ? match.Groups["Password"].Value : "guest";
+        host = match.Groups["host"].Success ? match.Groups["host"].Value : "localhost";
+        virtualHost = match.Groups["VirtualHost"].Success ? match.Groups["VirtualHost"].Value : "/";
+
+
+        return (name) => global::RabbitMqNext.ConnectionFactory.Connect(
+            host,
+            vhost: virtualHost,
+            username: username,
+            password: password,
+            recoverySettings: AutoRecoverySettings.All,
+            maxChannels: ushort.MaxValue,
+            connectionName: name
+            );
     }
 
-    DbConnectionStringBuilder connectionStringBuilder;
+    string connectionString;
+    string username;
+    string password;
+    string host;
+    string virtualHost;
     QueueBindings queueBindings;
     TransportTransactionMode transportTransactionMode;
     TransportTransactionMode requestedTransactionMode;

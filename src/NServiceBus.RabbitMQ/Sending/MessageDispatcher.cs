@@ -3,6 +3,7 @@
     using System.Collections.Generic;
     using System.Threading.Tasks;
     using Extensibility;
+    using RabbitMqNext;
 
     class MessageDispatcher : IDispatchMessages
     {
@@ -13,28 +14,29 @@
             this.channelProvider = channelProvider;
         }
 
-        public Task Dispatch(TransportOperations outgoingMessages, TransportTransaction transaction, ContextBag context)
+        public async Task Dispatch(TransportOperations outgoingMessages, TransportTransaction transaction, ContextBag context)
         {
-            var channel = channelProvider.GetPublishChannel();
+
+            var channel = await channelProvider.GetPublishChannel().ConfigureAwait(false);
 
             try
             {
                 var unicastTransportOperations = outgoingMessages.UnicastTransportOperations;
                 var multicastTransportOperations = outgoingMessages.MulticastTransportOperations;
 
-                var tasks = new List<Task>(unicastTransportOperations.Count + multicastTransportOperations.Count);
+            var tasks = new List<Task>(unicastTransportOperations.Count + multicastTransportOperations.Count);
 
-                foreach (var operation in unicastTransportOperations)
-                {
-                    tasks.Add(SendMessage(operation, channel));
-                }
+            foreach (var operation in unicastTransportOperations)
+            {
+                tasks.Add(SendMessage(operation, channel));
+            }
 
-                foreach (var operation in multicastTransportOperations)
-                {
-                    tasks.Add(PublishMessage(operation, channel));
-                }
+            foreach (var operation in multicastTransportOperations)
+            {
+                tasks.Add(PublishMessage(operation, channel));
+            }
 
-                return tasks.Count == 1 ? tasks[0] : Task.WhenAll(tasks);
+                await (tasks.Count == 1 ? tasks[0] : Task.WhenAll(tasks)).ConfigureAwait(false);
             }
             finally
             {
@@ -42,24 +44,28 @@
             }
         }
 
-        Task SendMessage(UnicastTransportOperation transportOperation, ConfirmsAwareChannel channel)
+        async Task SendMessage(UnicastTransportOperation transportOperation, NextChannel channel)
         {
             var message = transportOperation.Message;
 
-            var properties = channel.CreateBasicProperties();
+            var properties = channel.RentBasicProperties();
             properties.Fill(message, transportOperation.DeliveryConstraints);
 
-            return channel.SendMessage(transportOperation.Destination, message, properties);
+            await channel.SendMessage(transportOperation.Destination, message, properties).ConfigureAwait(false);
+
+            channel.ReturnBasicProperties(properties);
         }
 
-        Task PublishMessage(MulticastTransportOperation transportOperation, ConfirmsAwareChannel channel)
+        async Task PublishMessage(MulticastTransportOperation transportOperation, NextChannel channel)
         {
             var message = transportOperation.Message;
 
-            var properties = channel.CreateBasicProperties();
+            var properties = channel.RentBasicProperties();
             properties.Fill(message, transportOperation.DeliveryConstraints);
 
-            return channel.PublishMessage(transportOperation.MessageType, message, properties);
+            await channel.PublishMessage(transportOperation.MessageType, message, properties).ConfigureAwait(false);
+
+            channel.ReturnBasicProperties(properties);
         }
     }
 }

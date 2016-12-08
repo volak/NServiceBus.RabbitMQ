@@ -4,39 +4,60 @@
     using System.Collections.Generic;
     using System.Text;
     using System.Threading.Tasks;
-    using global::RabbitMQ.Client.Events;
     using Janitor;
     using Performance.TimeToBeReceived;
     using Routing;
     using Settings;
+    using RabbitMqNext;
+    using Logging;
 
     [SkipWeaving]
     class RabbitMQTransportInfrastructure : TransportInfrastructure, IDisposable
     {
+        readonly static ILog Logger = LogManager.GetLogger("RabbitMqTransport");
         readonly SettingsHolder settings;
-        readonly ConnectionFactory connectionFactory;
-        readonly ChannelProvider channelProvider;
         IRoutingTopology routingTopology;
+        ConnectionFactory connectionFactory;
+        ChannelProvider channelProvider;
+        IConnection receiveConnection;
 
         public RabbitMQTransportInfrastructure(SettingsHolder settings, string connectionString)
         {
+            LogAdapter.LogDebugFn = (@class, message, ex) => Logger.Debug($"{@class} {message}");
+            LogAdapter.LogWarnFn = (@class, message, ex) => Logger.Warn($"{@class} {message}", ex);
+            LogAdapter.LogErrorFn = (@class, message, ex) => Logger.Error($"{@class} {message}", ex);
+            LogAdapter.IsDebugEnabled = Logger.IsDebugEnabled;
+            LogAdapter.IsErrorEnabled = Logger.IsErrorEnabled;
+            LogAdapter.IsWarningEnabled = Logger.IsWarnEnabled;
+
             this.settings = settings;
-
             var connectionConfiguration = new ConnectionStringParser(settings.EndpointName()).Parse(connectionString);
-            connectionFactory = new ConnectionFactory(connectionConfiguration);
+			connectionFactory = new ConnectionFactory(connectionConfiguration);
 
-            routingTopology = CreateRoutingTopology();
+            CreateTopology();
+            
 
-            bool usePublisherConfirms;
-            if (!settings.TryGet(SettingsKeys.UsePublisherConfirms, out usePublisherConfirms))
-            {
-                usePublisherConfirms = true;
-            }
-
-            channelProvider = new ChannelProvider(connectionFactory, routingTopology, usePublisherConfirms);
+            connectionFactory = new ConnectionFactory(settings, connectionConfiguration);
+            
+            channelProvider = new ChannelProvider(connectionFactory, routingTopology, connectionConfiguration.publisherConfirms);
 
             RequireOutboxConsent = false;
         }
+
+
+        public override async Task Start()
+        {
+            Logger.Info("Starting RabbitMqNext transport");
+            receiveConnection = await connectionFactory.CreateConnection("Receive").ConfigureAwait(false);
+        }
+
+        public override Task Stop()
+        {
+            Logger.Info("Stopping RabbitMqNext transport");
+            receiveConnection.Dispose();
+            return Task.CompletedTask;
+        }
+
 
         public override IEnumerable<Type> DeliveryConstraints => new[] { typeof(DiscardIfNotReceivedBefore), typeof(NonDurableDelivery) };
 
@@ -88,26 +109,39 @@
             channelProvider.Dispose();
         }
 
-        IRoutingTopology CreateRoutingTopology()
+		void CreateTopology()
         {
-            var durable = settings.DurableMessagesEnabled();
-            Func<bool, IRoutingTopology> topologyFactory;
-
-            if (!settings.TryGet(out topologyFactory))
+            if (settings.HasSetting<IRoutingTopology>())
             {
-                topologyFactory = d => new ConventionalRoutingTopology(d);
+                routingTopology = settings.Get<IRoutingTopology>();
             }
+            else
+            {
+                var durable = settings.DurableMessagesEnabled();
 
-            return topologyFactory(durable);
+                DirectRoutingTopology.Conventions conventions;
+
+                if (settings.TryGet(out conventions))
+                {
+                    routingTopology = new DirectRoutingTopology(conventions, durable);
+                }
+                else
+                {
+                    routingTopology = new ConventionalRoutingTopology(durable);
+                }
+            }
+            Logger.Debug($"Using routing topology {routingTopology.GetType().Name}");
         }
+
 
         IPushMessages CreateMessagePump()
         {
+            Logger.Debug("Creating message pump");
             MessageConverter messageConverter;
 
             if (settings.HasSetting(SettingsKeys.CustomMessageIdStrategy))
             {
-                messageConverter = new MessageConverter(settings.Get<Func<BasicDeliverEventArgs, string>>(SettingsKeys.CustomMessageIdStrategy));
+                messageConverter = new MessageConverter(settings.Get<Func<MessageDelivery, string>>(SettingsKeys.CustomMessageIdStrategy));
             }
             else
             {
@@ -142,7 +176,7 @@
                 prefetchCount = 0;
             }
 
-            return new MessagePump(connectionFactory, messageConverter, consumerTag, channelProvider, queuePurger, timeToWaitBeforeTriggeringCircuitBreaker, prefetchMultiplier, prefetchCount);
+            return new MessagePump(receiveConnection, messageConverter, consumerTag, channelProvider, queuePurger, timeToWaitBeforeTriggeringCircuitBreaker, prefetchMultiplier, prefetchCount);
         }
     }
 }

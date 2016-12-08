@@ -1,5 +1,7 @@
 ﻿namespace NServiceBus.Transport.RabbitMQ
 {
+    using System;
+    using RabbitMqNext;
     using System.Threading.Tasks;
     using global::RabbitMQ.Client;
 
@@ -16,7 +18,7 @@
             this.durableMessagesEnabled = durableMessagesEnabled;
         }
 
-        public Task CreateQueueIfNecessary(QueueBindings queueBindings, string identity)
+        public async Task CreateQueueIfNecessary(QueueBindings queueBindings, string identity)
         {
             using (var connection = connectionFactory.CreateAdministrationConnection())
             using (var channel = connection.CreateModel())
@@ -31,24 +33,25 @@
                 {
                     foreach (var receivingAddress in queueBindings.ReceivingAddresses)
                     {
-                        CreateQueueIfNecessary(channel, receivingAddress);
+                		await CreateQueueIfNecessary(channel, receivingAddress);
                     }
 
                     foreach (var sendingAddress in queueBindings.SendingAddresses)
                     {
-                        CreateQueueIfNecessary(channel, sendingAddress);
+                		await CreateQueueIfNecessary(channel, sendingAddress);
                     }
                 }
             }
 
-            return TaskEx.CompletedTask;
         }
 
-        void CreateQueueIfNecessary(IModel channel, string receivingAddress)
+        async Task CreateQueueIfNecessary(IChannel channel, string receivingAddress)
         {
-            channel.QueueDeclare(receivingAddress, durableMessagesEnabled, false, false, null);
+                await channel.QueueDeclare(receivingAddress, false, durableMessagesEnabled, false, false, null, true).ConfigureAwait(false);
 
-            routingTopology.Initialize(channel, receivingAddress);
+                await routingTopology.Initialize(channel, receivingAddress).ConfigureAwait(false);
+
+                await channel.Close().ConfigureAwait(false);
         }
     }
 }

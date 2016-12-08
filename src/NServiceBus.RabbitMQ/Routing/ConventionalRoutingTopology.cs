@@ -2,8 +2,6 @@
 {
     using System;
     using System.Collections.Concurrent;
-    using System.Collections.Generic;
-    using System.Linq;
     using global::RabbitMQ.Client;
 
     /// <summary>
@@ -23,6 +21,7 @@
     /// </summary>
     class ConventionalRoutingTopology : IRoutingTopology, IDeclareQueues
     {
+        readonly static ILog Logger = LogManager.GetLogger("ConventionalRoutingTopology");
         readonly bool useDurableExchanges;
 
         public ConventionalRoutingTopology(bool useDurableExchanges)
@@ -30,7 +29,7 @@
             this.useDurableExchanges = useDurableExchanges;
         }
 
-        public void SetupSubscription(IModel channel, Type type, string subscriberName)
+        public async Task SetupSubscription(IChannel channel, Type type, string subscriberName)
         {
             if (type == typeof(IEvent))
             {
@@ -38,15 +37,15 @@
                 type = typeof(object);
             }
 
-            SetupTypeSubscriptions(channel, type);
-            channel.ExchangeBind(subscriberName, ExchangeName(type), string.Empty);
+            await SetupTypeSubscriptions(channel, type).ConfigureAwait(false);
+            await channel.ExchangeBind(ExchangeName(type), subscriberName, string.Empty, null, true).ConfigureAwait(false);
         }
 
-        public void TeardownSubscription(IModel channel, Type type, string subscriberName)
+        public async Task TeardownSubscription(IChannel channel, Type type, string subscriberName)
         {
             try
             {
-                channel.ExchangeUnbind(subscriberName, ExchangeName(type), string.Empty, null);
+                await channel.ExchangeUnbind(ExchangeName(type), subscriberName, string.Empty, null, true).ConfigureAwait(false);
             }
             // ReSharper disable EmptyGeneralCatchClause
             catch (Exception)
@@ -56,20 +55,29 @@
             }
         }
 
-        public void Publish(IModel channel, Type type, OutgoingMessage message, IBasicProperties properties)
+        public async Task Publish(IChannel channel, Type type, OutgoingMessage message, BasicProperties properties)
         {
-            SetupTypeSubscriptions(channel, type);
-            channel.BasicPublish(ExchangeName(type), String.Empty, false, properties, message.Body);
+            await SetupTypeSubscriptions(channel, type).ConfigureAwait(false);
+            if (channel.IsConfirmationEnabled)
+                await channel.BasicPublishWithConfirmation(ExchangeName(type), String.Empty, false, properties, new ArraySegment<byte>(message.Body)).ConfigureAwait(false);
+            else
+                await channel.BasicPublish(ExchangeName(type), String.Empty, false, properties, message.Body).ConfigureAwait(false);
         }
 
-        public void Send(IModel channel, string address, OutgoingMessage message, IBasicProperties properties)
+        public async Task Send(IChannel channel, string address, OutgoingMessage message, BasicProperties properties)
         {
-            channel.BasicPublish(address, String.Empty, true, properties, message.Body);
+            if (channel.IsConfirmationEnabled)
+                await channel.BasicPublishWithConfirmation(address, String.Empty, true, properties, new ArraySegment<byte>(message.Body)).ConfigureAwait(false);
+            else
+                await channel.BasicPublish(address, String.Empty, true, properties, message.Body).ConfigureAwait(false);
         }
 
-        public void RawSendInCaseOfFailure(IModel channel, string address, byte[] body, IBasicProperties properties)
+        public async Task RawSendInCaseOfFailure(IChannel channel, string address, byte[] body, BasicProperties properties)
         {
-            channel.BasicPublish(address, String.Empty, true, properties, body);
+            if (channel.IsConfirmationEnabled)
+                await channel.BasicPublishWithConfirmation(address, String.Empty, true, properties, new ArraySegment<byte>(body)).ConfigureAwait(false);
+            else
+                await channel.BasicPublish(address, String.Empty, true, properties, body).ConfigureAwait(false);
         }
 
         public void DeclareAndInitialize(IModel channel, IEnumerable<string> receivingAddresses, IEnumerable<string> sendingAddresses)
@@ -81,39 +89,46 @@
             }
         }
 
-        public void Initialize(IModel channel, string mainQueue)
+
+        public async Task Initialize(IChannel channel, string mainQueue)
         {
-            CreateExchange(channel, mainQueue);
-            channel.QueueBind(mainQueue, mainQueue, string.Empty);
+            await CreateExchange(channel, mainQueue).ConfigureAwait(false);
+            await channel.QueueBind(mainQueue, mainQueue, string.Empty, null, true).ConfigureAwait(false);
         }
 
         static string ExchangeName(Type type) => type.Namespace + ":" + type.Name;
 
-        void SetupTypeSubscriptions(IModel channel, Type type)
+        async Task SetupTypeSubscriptions(IChannel channel, Type type)
         {
             if (type == typeof(Object) || IsTypeTopologyKnownConfigured(type))
             {
                 return;
             }
 
-            var typeToProcess = type;
-            CreateExchange(channel, ExchangeName(typeToProcess));
-            var baseType = typeToProcess.BaseType;
+            Logger.Info($"Creating exchange for {type.FullName}");
+            await CreateExchange(channel, ExchangeName(type)).ConfigureAwait(false);
+            var baseType = type.BaseType;
 
+
+            var typeToProcess = type;
             while (baseType != null)
             {
-                CreateExchange(channel, ExchangeName(baseType));
-                channel.ExchangeBind(ExchangeName(baseType), ExchangeName(typeToProcess), string.Empty);
+                Logger.Info($"Creating exchange for base type {baseType.FullName}");
+                await CreateExchange(channel, ExchangeName(baseType)).ConfigureAwait(false);
+                await channel.ExchangeBind(ExchangeName(typeToProcess), ExchangeName(baseType), string.Empty, null, true).ConfigureAwait(false);
                 typeToProcess = baseType;
                 baseType = typeToProcess.BaseType;
             }
 
-            foreach (var interfaceType in type.GetInterfaces())
+            if (type.IsInterface)
             {
-                var exchangeName = ExchangeName(interfaceType);
+                foreach (var interfaceType in type.GetInterfaces())
+                {
+                    Logger.Info($"Creating exchange for interface type {interfaceType.FullName}");
 
-                CreateExchange(channel, exchangeName);
-                channel.ExchangeBind(exchangeName, ExchangeName(type), string.Empty);
+                    await CreateExchange(channel, ExchangeName(interfaceType)).ConfigureAwait(false);
+                    await channel.ExchangeBind(ExchangeName(type), ExchangeName(interfaceType), string.Empty, null, true).ConfigureAwait(false);
+                }
             }
 
             MarkTypeConfigured(type);
@@ -126,11 +141,11 @@
 
         bool IsTypeTopologyKnownConfigured(Type eventType) => typeTopologyConfiguredSet.ContainsKey(eventType);
 
-        void CreateExchange(IModel channel, string exchangeName)
+        async Task CreateExchange(IChannel channel, string exchangeName)
         {
             try
             {
-                channel.ExchangeDeclare(exchangeName, ExchangeType.Fanout, useDurableExchanges);
+                await channel.ExchangeDeclare(exchangeName, "fanout", useDurableExchanges, false, null, true).ConfigureAwait(false);
             }
             // ReSharper disable EmptyGeneralCatchClause
             catch (Exception)

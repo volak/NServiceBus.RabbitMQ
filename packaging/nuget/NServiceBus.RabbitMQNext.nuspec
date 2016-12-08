@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<package xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd">
+  <metadata xmlns="http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd">
+    <id>NServiceBus.RabbitMQNext</id>
+    <title>NServiceBus RabbitMQNext</title>
+    <version>$version$</version>
+    <authors>Charles Solar</authors>
+    <owners>Charles Solar</owners>
+    <projectUrl>https://github.com/volak/NServiceBus.RabbitMQ</projectUrl>
+    <description>Fork of Particular's RabbitMq transport to use RabbitMqNext instead of official client - I am NOT affiliated with Particular</description>
+    <releaseNotes></releaseNotes>
+    <tags>nservicebus servicebus cqrs publish subscribe rabbitmq rabbitmqnext</tags>
+    <dependencies>
+      <dependency id="NServiceBus" version="[6.0.0, 7.0.0)" />
+      <dependency id="RabbitMQNext" version="[1.0.0, 1.1.0)" />
+    </dependencies>
+  </metadata>
+  <files>
+    <file src="..\..\binaries\NServiceBus.Transports.RabbitMQNext.???" target="lib\net461" />
+  </files>
+</package>

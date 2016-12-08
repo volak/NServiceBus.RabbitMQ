@@ -8,6 +8,7 @@
 
     class ConnectionConfiguration
     {
+
         public string Host { get; set; }
 
         public int Port { get; set; }
@@ -21,6 +22,8 @@
         public ushort RequestedHeartbeat { get; set; }
 
         public TimeSpan RetryDelay { get; set; }
+
+        public Int32 MaxChannels { get; set; }
 
         public bool UseTls { get; set; }
 
@@ -42,6 +45,7 @@
             UseTls = false;
             CertPath = "";
             CertPassphrase = null;
+			MaxChannels = 150;
 
             SetDefaultClientProperties(endpointName);
         }

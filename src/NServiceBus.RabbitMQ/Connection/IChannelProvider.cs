@@ -1,9 +1,11 @@
-﻿namespace NServiceBus.Transport.RabbitMQ
+﻿using RabbitMqNext;
+using System.Threading.Tasks;
+
+namespace NServiceBus.Transport.RabbitMQ
 {
     interface IChannelProvider
     {
-        ConfirmsAwareChannel GetPublishChannel();
-
-        void ReturnPublishChannel(ConfirmsAwareChannel channel);
+        Task<NextChannel> GetPublishChannel();
+        void ReturnPublishChannel(NextChannel channel);
     }
 }
