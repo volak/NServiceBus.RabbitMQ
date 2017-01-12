@@ -24,18 +24,18 @@
         }
 
         [Test]
-        public void Should_be_able_to_receive_messages_without_headers()
+        public async Task Should_be_able_to_receive_messages_without_headers()
         {
             var message = new OutgoingMessage(Guid.NewGuid().ToString(), new Dictionary<string, string>(), new byte[0]);
 
-            using (var connection = connectionFactory.CreatePublishConnection())
-            using (var channel = connection.CreateModel())
+            using (var connection = await connectionFactory.CreatePublishConnection())
+            using (var channel = await connection.CreateChannel())
             {
-                var properties = channel.CreateBasicProperties();
+                var properties = channel.RentBasicProperties();
 
                 properties.MessageId = message.MessageId;
 
-                channel.BasicPublish(string.Empty, ReceiverQueue, false, properties, message.Body);
+                await channel.BasicPublish(string.Empty, ReceiverQueue, false, properties, new ArraySegment<byte>(message.Body));
             }
 
             var received = WaitForMessage();
@@ -44,20 +44,20 @@
         }
 
         [Test]
-        public void Should_move_message_without_message_id_to_error_queue()
+        public async Task Should_move_message_without_message_id_to_error_queue()
         {
             var message = new OutgoingMessage(Guid.NewGuid().ToString(), new Dictionary<string, string>(), new byte[0]);
 
-            using (var connection = connectionFactory.CreatePublishConnection())
-            using (var channel = connection.CreateModel())
+            using (var connection = await connectionFactory.CreatePublishConnection())
+            using (var channel = await connection.CreateChannel())
             {
-                var properties = channel.CreateBasicProperties();
+                var properties = channel.RentBasicProperties();
 
-                channel.BasicPublish(string.Empty, ReceiverQueue, false, properties, message.Body);
+                await channel.BasicPublish(string.Empty, ReceiverQueue, false, properties, new ArraySegment<byte>(message.Body));
 
                 var received = WaitForMessage();
 
-                var result = channel.BasicGet(ErrorQueue, true);
+                var result = await GetOne(channel, ErrorQueue);
 
                 Assert.Null(received, "Message should not be processed processed successfully.");
                 Assert.NotNull(result, "Message should be considered poison and moved to the error queue.");
@@ -65,21 +65,21 @@
         }
 
         [Test]
-        public void Should_up_convert_the_native_type_to_the_enclosed_message_types_header_if_empty()
+        public async Task Should_up_convert_the_native_type_to_the_enclosed_message_types_header_if_empty()
         {
             var message = new OutgoingMessage(Guid.NewGuid().ToString(), new Dictionary<string, string>(), new byte[0]);
 
             var typeName = typeof(MyMessage).FullName;
 
-            using (var connection = connectionFactory.CreatePublishConnection())
-            using (var channel = connection.CreateModel())
+            using (var connection = await connectionFactory.CreatePublishConnection())
+            using (var channel = await connection.CreateChannel())
             {
-                var properties = channel.CreateBasicProperties();
+                var properties = channel.RentBasicProperties();
 
                 properties.MessageId = message.MessageId;
                 properties.Type = typeName;
 
-                channel.BasicPublish(string.Empty, ReceiverQueue, false, properties, message.Body);
+                await channel.BasicPublish(string.Empty, ReceiverQueue, false, properties, new ArraySegment<byte>(message.Body));
             }
 
             var received = WaitForMessage();

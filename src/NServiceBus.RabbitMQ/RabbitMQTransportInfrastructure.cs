@@ -32,7 +32,6 @@
 
             this.settings = settings;
             var connectionConfiguration = new ConnectionStringParser(settings.EndpointName()).Parse(connectionString);
-			connectionFactory = new ConnectionFactory(settings, connectionConfiguration);
 
             routingTopology = CreateRoutingTopology();
 
@@ -42,7 +41,7 @@
                 usePublisherConfirms = true;
             }
 
-            connectionFactory = new ConnectionFactory(settings, connectionConfiguration);
+            connectionFactory = new ConnectionFactory(settings.InstanceSpecificQueue, connectionConfiguration);
             channelProvider = new ChannelProvider(connectionFactory, routingTopology, usePublisherConfirms);
 
             RequireOutboxConsent = false;

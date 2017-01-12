@@ -4,18 +4,17 @@ namespace NServiceBus.Transport.RabbitMQ
     using System;
     using System.Threading.Tasks;
     using global::RabbitMqNext;
-    using Settings;
-    
+
     class ConnectionFactory
     {
         readonly Func<String, Task<IConnection>> connectionFactory;
-        readonly ReadOnlySettings settings;
+        readonly Func<string> instanceSpecificQueue;
 
-        public ConnectionFactory(ReadOnlySettings settings, ConnectionConfiguration connectionConfiguration)
+        public ConnectionFactory(Func<string> instanceSpecificQueue, ConnectionConfiguration connectionConfiguration)
         {
-            if (settings == null)
+            if (instanceSpecificQueue == null)
             {
-                throw new ArgumentException(nameof(settings));
+                throw new ArgumentException(nameof(instanceSpecificQueue));
             }
             if (connectionConfiguration == null)
             {
@@ -26,7 +25,7 @@ namespace NServiceBus.Transport.RabbitMQ
             {
                 throw new ArgumentException("The connectionConfiguration has a null Host.", nameof(connectionConfiguration));
             }
-            this.settings = settings;
+            this.instanceSpecificQueue = instanceSpecificQueue;
             this.connectionFactory = (connectionName) => RabbitMqNext.ConnectionFactory.Connect(
                 connectionConfiguration.Host,
                 vhost: connectionConfiguration.VirtualHost,
@@ -47,7 +46,7 @@ namespace NServiceBus.Transport.RabbitMQ
         {
             //connectionFactory.ClientProperties["connected"] = DateTime.Now.ToString("G");
 
-            return connectionFactory($"{settings.InstanceSpecificQueue()} - {connectionName}");
+            return connectionFactory($"{instanceSpecificQueue()} - {connectionName}");
 
         }
 

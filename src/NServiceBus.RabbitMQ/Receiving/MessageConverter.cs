@@ -19,7 +19,18 @@
             this.messageIdStrategy = messageIdStrategy;
         }
 
-        public string RetrieveMessageId(MessageDelivery message) => messageIdStrategy(message);
+        public string RetrieveMessageId(MessageDelivery message)
+        {
+            var messageId = messageIdStrategy(message);
+
+            object header = null;
+            if (string.IsNullOrWhiteSpace(messageId) && !message.properties.Headers.TryGetValue(Headers.MessageId, out header))
+            {
+                throw new InvalidOperationException("The message ID strategy did not provide a message ID, and the message does not have an 'NServiceBus.MessageId' header.");
+            }
+
+            return string.IsNullOrWhiteSpace(messageId) ? header?.ToString() : messageId;
+        }
 
         public Dictionary<string, string> RetrieveHeaders(MessageDelivery message)
         {

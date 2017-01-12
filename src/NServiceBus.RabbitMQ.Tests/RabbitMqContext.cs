@@ -5,32 +5,34 @@
     using System.Diagnostics;
     using System.Threading.Tasks;
     using NUnit.Framework;
+    using RabbitMqNext;
+    using ConnectionFactory = NServiceBus.Transport.RabbitMQ.ConnectionFactory;
 
     class RabbitMqContext
     {
-        protected void MakeSureQueueAndExchangeExists(string queueName)
+        protected async Task MakeSureQueueAndExchangeExists(string queueName)
         {
-            using (var connection = connectionFactory.CreateAdministrationConnection())
-            using (var channel = connection.CreateModel())
+            using (var connection = await connectionFactory.CreateAdministrationConnection())
+            using (var channel = await connection.CreateChannel())
             {
-                channel.QueueDeclare(queueName, true, false, false, null);
-                channel.QueuePurge(queueName);
+                await channel.QueueDeclare(queueName, false, false, false, false, null, true);
+                await channel.QueuePurge(queueName, true);
 
                 //to make sure we kill old subscriptions
-                DeleteExchange(queueName);
+                await DeleteExchange(queueName);
 
-                routingTopology.Initialize(channel, queueName);
+                await routingTopology.Initialize(channel, queueName);
             }
         }
 
-        void DeleteExchange(string exchangeName)
+        async Task DeleteExchange(string exchangeName)
         {
-            using (var connection = connectionFactory.CreateAdministrationConnection())
-            using (var channel = connection.CreateModel())
+            using (var connection = await connectionFactory.CreateAdministrationConnection())
+            using (var channel = await connection.CreateChannel())
             {
                 try
                 {
-                    channel.ExchangeDelete(exchangeName, false);
+                    await channel.ExchangeDelete(exchangeName, false);
                 }
                 // ReSharper disable EmptyGeneralCatchClause
                 catch (Exception)
@@ -43,7 +45,7 @@
         public virtual int MaximumConcurrency => 1;
 
         [SetUp]
-        public void SetUp()
+        public async Task SetUp()
         {
             routingTopology = new ConventionalRoutingTopology(true);
             receivedMessages = new BlockingCollection<IncomingMessage>();
@@ -64,27 +66,29 @@
                 config.VirtualHost = "nsb-rabbitmq-test";
             }
 
-            connectionFactory = new ConnectionFactory(config);
+            connectionFactory = new ConnectionFactory(() => "unit test", config);
             channelProvider = new ChannelProvider(connectionFactory, routingTopology, true);
+            connection = await connectionFactory.CreateConnection("unit test");
 
             messageDispatcher = new MessageDispatcher(channelProvider);
 
             var purger = new QueuePurger(connectionFactory);
 
-            messagePump = new MessagePump(connectionFactory, new MessageConverter(), "Unit test", channelProvider, purger, TimeSpan.FromMinutes(2), 3, 0);
+            messagePump = new MessagePump(connection, new MessageConverter(), "Unit test", channelProvider, purger, TimeSpan.FromMinutes(2), 3, 0);
 
-            MakeSureQueueAndExchangeExists(ReceiverQueue);
-            MakeSureQueueAndExchangeExists(ErrorQueue);
+            await MakeSureQueueAndExchangeExists(ReceiverQueue);
+            await MakeSureQueueAndExchangeExists(ErrorQueue);
+
 
             subscriptionManager = new SubscriptionManager(connectionFactory, routingTopology, ReceiverQueue);
 
             messagePump.Init(messageContext =>
             {
                 receivedMessages.Add(new IncomingMessage(messageContext.MessageId, messageContext.Headers, messageContext.Body));
-                return TaskEx.CompletedTask;
+                return Task.CompletedTask;
             },
                 ErrorContext => Task.FromResult(ErrorHandleResult.Handled),
-                new CriticalError(_ => TaskEx.CompletedTask),
+                new CriticalError(_ => Task.CompletedTask),
                 new PushSettings(ReceiverQueue, ErrorQueue, true, TransportTransactionMode.ReceiveOnly)
             ).GetAwaiter().GetResult();
 
@@ -114,10 +118,25 @@
             return message;
         }
 
+        protected async Task<MessageDelivery> GetOne(IChannel channel, string queueToReceiveOn)
+        {
+            var tsc = new TaskCompletionSource<MessageDelivery>();
+
+
+            await channel.BasicConsume(ConsumeMode.ParallelWithBufferCopy, (msg) =>
+            {
+                tsc.SetResult(msg);
+                return Task.CompletedTask;
+            }, queueToReceiveOn, "test", true, false, null, true);
+
+            return await tsc.Task;
+        }
+
         protected const string ReceiverQueue = "testreceiver";
         protected const string ErrorQueue = "error";
         protected MessageDispatcher messageDispatcher;
         protected ConnectionFactory connectionFactory;
+        protected IConnection connection;
         private ChannelProvider channelProvider;
         protected MessagePump messagePump;
         BlockingCollection<IncomingMessage> receivedMessages;

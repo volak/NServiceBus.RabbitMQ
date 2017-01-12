@@ -24,7 +24,7 @@
             };
 
             var headers = converter.RetrieveHeaders(message);
-            var messageId = converter.RetrieveMessageId(message, headers);
+            var messageId = converter.RetrieveMessageId(message);
 
             Assert.IsNotNull(messageId);
             Assert.IsNotNull(headers);
@@ -33,14 +33,14 @@
         [Test]
         public void Should_throw_exception_when_no_message_id_is_set()
         {
-            var message = new BasicDeliverEventArgs
+            var message = new MessageDelivery
             {
-                BasicProperties = new BasicProperties()
+                properties = new BasicProperties()
             };
 
             var headers = new Dictionary<string, string>();
 
-            Assert.Throws<InvalidOperationException>(() => converter.RetrieveMessageId(message, headers));
+            Assert.Throws<InvalidOperationException>(() => converter.RetrieveMessageId(message));
         }
 
         [Test]
@@ -48,14 +48,14 @@
         {
             var customConverter = new MessageConverter(args => "");
 
-            var message = new BasicDeliverEventArgs
+            var message = new MessageDelivery
             {
-                BasicProperties = new BasicProperties()
+                properties = new BasicProperties()
             };
 
             var headers = new Dictionary<string, string>();
 
-            Assert.Throws<InvalidOperationException>(() => customConverter.RetrieveMessageId(message, headers));
+            Assert.Throws<InvalidOperationException>(() => customConverter.RetrieveMessageId(message));
         }
 
         [Test]
@@ -63,14 +63,13 @@
         {
             var customConverter = new MessageConverter(args => "");
 
-            var message = new BasicDeliverEventArgs
+            var message = new MessageDelivery
             {
-                BasicProperties = new BasicProperties()
+                properties = new BasicProperties()
             };
+            message.properties.Headers[Headers.MessageId] = "Blah";
 
-            var headers = new Dictionary<string, string> { { Headers.MessageId, "Blah" } };
-
-            var messageId = customConverter.RetrieveMessageId(message, headers);
+            var messageId = customConverter.RetrieveMessageId(message);
 
             Assert.AreEqual(messageId, "Blah");
         }

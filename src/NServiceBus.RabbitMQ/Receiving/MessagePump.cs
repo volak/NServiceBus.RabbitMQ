@@ -90,11 +90,11 @@
             Logger.Debug($"Creating consumer {consumerTag} with prefetch {prefetchCount}");
             channel = connection.CreateChannel().Result;
             channel.BasicQos(0, (ushort)Math.Min(prefetchCount, ushort.MaxValue), false).Wait();
-            
-            channel.BasicConsume(ConsumeMode.SerializedWithBufferCopy, this, settings.InputQueue, consumerTag, false, false, null, true).Wait();
-            
+
+            channel.BasicConsume(ConsumeMode.ParallelWithBufferCopy, this, settings.InputQueue, consumerTag, false, false, null, true).Wait();
+
         }
-        
+
         public async Task Stop()
         {
             Logger.Info($"Stopping message pump {settings.InputQueue}");
@@ -106,7 +106,7 @@
 
             await channel.Close().ConfigureAwait(false);
             channel.Dispose();
-            
+
             if (!connection.IsClosed)
                 connection.Dispose();
         }
@@ -133,11 +133,6 @@
 
         public async Task Consume(MessageDelivery delivery)
         {
-            try
-            {
-                await semaphore.WaitAsync(messageProcessing.Token).ConfigureAwait(false);
-            }
-            catch (OperationCanceledException) { return; }
 
             string messageId;
 
@@ -167,6 +162,7 @@
                 return;
             }
 
+
             using (var tokenSource = new CancellationTokenSource())
             {
                 var processed = false;
@@ -175,29 +171,42 @@
 
                 if (delivery.stream.Length > Int32.MaxValue)
                     throw new InvalidOperationException("Your message is huge...");
-                
+
                 var body = new byte[delivery.stream.Length];
                 try
                 {
-                    await delivery.stream.ReadAsync(body, 0, (Int32) delivery.stream.Length, messageProcessing.Token).ConfigureAwait(false);
+                    await delivery.stream.ReadAsync(body, 0, (Int32)delivery.stream.Length, messageProcessing.Token).ConfigureAwait(false);
                 }
                 catch (OperationCanceledException) { return; }
 
-                while (!processed && !errorHandled)
+                try
                 {
-                    try
+                    await semaphore.WaitAsync(messageProcessing.Token).ConfigureAwait(false);
+                }
+                catch (OperationCanceledException) { return; }
+                try
+                {
+                    while (!processed && !errorHandled)
                     {
-                        var messageContext = new MessageContext(messageId, headers, body, transportTranaction, tokenSource, contextBag);
-                        await onMessage(messageContext).ConfigureAwait(false);
-                        processed = true;
-                    }
-                    catch (Exception ex)
-                    {
-                        ++numberOfDeliveryAttempts;
-                        var errorContext = new ErrorContext(ex, headers, messageId, body, transportTranaction, numberOfDeliveryAttempts);
-                        errorHandled = await onError(errorContext).ConfigureAwait(false) == ErrorHandleResult.Handled;
+                        try
+                        {
+                            var messageContext = new MessageContext(messageId, headers, body, transportTranaction, tokenSource, contextBag);
+                            await onMessage(messageContext).ConfigureAwait(false);
+                            processed = true;
+                        }
+                        catch (Exception ex)
+                        {
+                            ++numberOfDeliveryAttempts;
+                            var errorContext = new ErrorContext(ex, headers, messageId, body, transportTranaction, numberOfDeliveryAttempts);
+                            errorHandled = await onError(errorContext).ConfigureAwait(false) == ErrorHandleResult.Handled;
+                        }
                     }
                 }
+                finally
+                {
+                    semaphore.Release();
+                }
+
                 if (processed && tokenSource.IsCancellationRequested)
                 {
                     channel.BasicNAck(delivery.deliveryTag, false, true);
@@ -224,7 +233,7 @@
                 var body = new byte[delivery.stream.Length];
                 await delivery.stream.ReadAsync(body, 0, (Int32)delivery.stream.Length).ConfigureAwait(false);
 
-                await poisonChannel.RawSendInCaseOfFailure(queue, body, delivery.properties).ConfigureAwait(false);
+                await poisonChannel.RawSendInCaseOfFailure(queue, body, delivery.properties.Clone()).ConfigureAwait(false);
             }
             catch (Exception ex)
             {
