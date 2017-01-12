@@ -13,7 +13,7 @@
         protected async Task MakeSureQueueAndExchangeExists(string queueName)
         {
             using (var connection = await connectionFactory.CreateAdministrationConnection())
-            using (var channel = await connection.CreateChannel())
+            using (var channel = await connection.CreateChannelWithPublishConfirmation())
             {
                 await channel.QueueDeclare(queueName, false, false, false, false, null, true);
                 await channel.QueuePurge(queueName, true);
@@ -28,7 +28,7 @@
         async Task DeleteExchange(string exchangeName)
         {
             using (var connection = await connectionFactory.CreateAdministrationConnection())
-            using (var channel = await connection.CreateChannel())
+            using (var channel = await connection.CreateChannelWithPublishConfirmation())
             {
                 try
                 {

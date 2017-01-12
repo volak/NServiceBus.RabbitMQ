@@ -82,7 +82,7 @@ class ConfigureEndpointRabbitMQTransport : IConfigureEndpointTestExecution
         var queues = await GetQueues(factory);
 
         using (var connection = await factory("Test Queue Purger"))
-        using (var channel = await connection.CreateChannel())
+        using (var channel = await connection.CreateChannelWithPublishConfirmation())
         {
             foreach (var queue in queues)
             {

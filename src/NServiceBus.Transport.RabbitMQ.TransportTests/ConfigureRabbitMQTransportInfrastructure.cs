@@ -84,7 +84,7 @@ class ConfigureRabbitMQTransportInfrastructure : IConfigureTransportInfrastructu
         Func<string, Task<IConnection>> factory = name => ConnectionFactory.Connect(hostname, virtualhost, username, password, connectionName: name);
 
         using (var connection = await factory("Test Queue Purger"))
-        using (var channel = await connection.CreateChannel())
+        using (var channel = await connection.CreateChannelWithPublishConfirmation())
         {
             foreach (var queue in queueBindings.ReceivingAddresses)
             {
