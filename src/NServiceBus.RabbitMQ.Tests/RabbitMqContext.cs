@@ -109,7 +109,7 @@
 
             if (Debugger.IsAttached)
             {
-                waitTime = TimeSpan.FromMinutes(10);
+                waitTime = TimeSpan.FromSeconds(10);
             }
 
             IncomingMessage message;

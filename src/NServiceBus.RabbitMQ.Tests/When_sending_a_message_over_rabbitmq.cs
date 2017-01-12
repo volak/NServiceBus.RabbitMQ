@@ -109,6 +109,7 @@
 
             var body = new byte[result.stream.Length];
             await result.stream.ReadAsync(body, 0, (Int32)result.stream.Length).ConfigureAwait(false);
+
             var incomingMessage = new IncomingMessage(convertedMessageId, convertedHeaders, body);
 
             assertion(incomingMessage, result);
@@ -123,7 +124,6 @@
             using (var connection = await connectionFactory.CreateConnection("Consume"))
             using (var channel = await connection.CreateChannel())
             {
-
                 var message = await GetOne(channel, queueToReceiveOn);
 
                 if (message == null)
@@ -141,7 +141,6 @@
                 return message;
             }
         }
-        
 
         class MyMessage
         {

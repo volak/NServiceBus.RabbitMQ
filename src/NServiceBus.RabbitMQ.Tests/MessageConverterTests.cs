@@ -67,6 +67,7 @@
             {
                 properties = new BasicProperties()
             };
+
             message.properties.Headers[Headers.MessageId] = "Blah";
 
             var messageId = customConverter.RetrieveMessageId(message);
@@ -77,12 +78,14 @@
         [Test]
         public void TestCanHandleByteArrayHeader()
         {
-            var props = new BasicProperties { MessageId = "Blah" };
-            props.Headers["Foo"] = Encoding.UTF8.GetBytes("blah");
             var message = new MessageDelivery
             {
-                properties = props
+                properties = new BasicProperties()
+                {
+                    MessageId = "Blah",
+                }
             };
+            message.properties.Headers["Foo"] = Encoding.UTF8.GetBytes("blah");
 
             var headers = converter.RetrieveHeaders(message);
 
@@ -95,7 +98,7 @@
         {
             var message = new MessageDelivery
             {
-                properties = new BasicProperties
+                properties = new BasicProperties()
                 {
                     ReplyTo = "myaddress",
                     MessageId = "Blah"
@@ -111,16 +114,15 @@
         [Test]
         public void Should_override_replyto_header_if_native_replyto_is_present()
         {
-            var props = new BasicProperties
-            {
-                ReplyTo = "myaddress",
-                MessageId = "Blah"
-            };
-            props.Headers[Headers.ReplyToAddress] = Encoding.UTF8.GetBytes("nsb set address");
             var message = new MessageDelivery
             {
-                properties = props
+                properties = new BasicProperties()
+                {
+                    ReplyTo = "myaddress",
+                    MessageId = "Blah",
+                }
             };
+            message.properties.Headers[Headers.ReplyToAddress] = Encoding.UTF8.GetBytes("nsb set address");
 
             var headers = converter.RetrieveHeaders(message);
 
@@ -133,20 +135,17 @@
         {
             var message = new MessageDelivery
             {
-                properties = new BasicProperties
+                properties = new BasicProperties()
                 {
                     MessageId = "Blah",
-                    //Headers = new Dictionary<string, object>
-                    //{
-                    //    {"Foo", "ni"}
-                    //}
                 }
             };
+            message.properties.Headers["Foo"] = "ni";
 
             var headers = converter.RetrieveHeaders(message);
 
             Assert.NotNull(headers);
-            //Assert.AreEqual("ni", headers["Foo"]);
+            Assert.AreEqual("ni", headers["Foo"]);
         }
 
         [Test]
@@ -154,20 +153,20 @@
         {
             var message = new MessageDelivery
             {
-                properties = new BasicProperties
+                properties = new BasicProperties()
                 {
                     MessageId = "Blah",
-                    //    Headers = new Dictionary<string, object>
-                    //{
-                    //    {"Foo", new ArrayList{"Bing"}}
-                    //}
                 }
+            };
+            message.properties.Headers["Foo"] = new ArrayList
+            {
+                "Bing"
             };
 
             var headers = converter.RetrieveHeaders(message);
 
             Assert.NotNull(headers);
-            //Assert.AreEqual("Bing", headers["Foo"]);
+            Assert.AreEqual("Bing", headers["Foo"]);
         }
 
         [Test]
@@ -175,20 +174,20 @@
         {
             var message = new MessageDelivery
             {
-                properties = new BasicProperties
+                properties = new BasicProperties()
                 {
                     MessageId = "Blah",
-                    //Headers = new Dictionary<string, object>
-                    //{
-                    //    {"Foo", new List<object>{"Bing"}}
-                    //}
                 }
+            };
+            message.properties.Headers["Foo"] = new List<object>
+            {
+                "Bing"
             };
 
             var headers = converter.RetrieveHeaders(message);
 
             Assert.NotNull(headers);
-            //Assert.AreEqual("Bing", headers["Foo"]);
+            Assert.AreEqual("Bing", headers["Foo"]);
         }
 
         [Test]
@@ -196,20 +195,17 @@
         {
             var message = new MessageDelivery
             {
-                properties = new BasicProperties
+                properties = new BasicProperties()
                 {
-                    MessageId = "Blah",
-                    //    Headers = new Dictionary<string, object>
-                    //{
-                    //    {"Foo", new List<object>{new Dictionary<string, object>{{"key1", Encoding.UTF8.GetBytes("value1")}, {"key2", Encoding.UTF8.GetBytes("value2")}}}}
-                    //}
+                    MessageId = "Blah"
                 }
             };
+            message.properties.Headers["Foo"]= new List<object> { new Dictionary<string, object> { { "key1", Encoding.UTF8.GetBytes("value1") }, { "key2", Encoding.UTF8.GetBytes("value2") } } };
 
-            var headers = converter.RetrieveHeaders(message);
+        var headers = converter.RetrieveHeaders(message);
 
             Assert.NotNull(headers);
-            //Assert.AreEqual("key1=value1,key2=value2", Convert.ToString(headers["Foo"]));
+            Assert.AreEqual("key1=value1,key2=value2", Convert.ToString(headers["Foo"]));
         }
     }
 }

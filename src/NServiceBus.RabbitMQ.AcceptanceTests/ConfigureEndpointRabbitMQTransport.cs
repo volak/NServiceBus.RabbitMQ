@@ -26,7 +26,7 @@ class ConfigureEndpointRabbitMQTransport : IConfigureEndpointTestExecution
     string virtualhost;
     string hostname;
 
-    public Task Configure(string endpointName, EndpointConfiguration configuration, RunSettings settings, PublisherMetadata publisherMetadata)
+    public Task Configure(string endpointName, EndpointConfiguration configuration, RunSettings settings)
     {
         var connectionString = Environment.GetEnvironmentVariable("RabbitMQTransport.ConnectionString");
 

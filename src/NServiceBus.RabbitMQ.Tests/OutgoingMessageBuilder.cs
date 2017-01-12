@@ -16,7 +16,7 @@
 
         public TransportOperations Build(int copies = 1)
         {
-            var message = new OutgoingMessage(messageId, headers, body ?? new byte[] {});
+            var message = new OutgoingMessage(messageId, headers, body);
 
             var transportOperations = new List<TransportOperation>();
 
