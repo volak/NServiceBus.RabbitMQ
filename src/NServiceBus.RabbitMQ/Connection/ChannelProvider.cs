@@ -18,7 +18,7 @@ namespace NServiceBus.Transport.RabbitMQ
             channels = new ConcurrentQueue<NextChannel>();
         }
 
-        public Task<NextChannel> GetPublishChannel()
+        public async Task<NextChannel> GetPublishChannel()
         {
             // Now we can connect
             var connection = this.connection.Value;
@@ -30,10 +30,16 @@ namespace NServiceBus.Transport.RabbitMQ
             {
                 channel?.Dispose();
 
-                channel = new NextChannel(connection, routingTopology, usePublisherConfirms);
+                IChannel model;
+                if (usePublisherConfirms)
+                    model = await connection.CreateChannelWithPublishConfirmation(maxunconfirmedMessages: 100).ConfigureAwait(false);
+                else
+                    model = await connection.CreateChannel().ConfigureAwait(false);
+
+                channel = new NextChannel(model, routingTopology, usePublisherConfirms);
             }
 
-            return Task.FromResult(channel);
+            return channel;
         }
 
         public void ReturnPublishChannel(NextChannel channel)

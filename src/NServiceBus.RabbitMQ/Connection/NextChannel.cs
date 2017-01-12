@@ -8,16 +8,14 @@ namespace NServiceBus.Transport.RabbitMQ
     [Janitor.SkipWeaving]
     class NextChannel : IDisposable
     {
-        public NextChannel(IConnection connection, IRoutingTopology routingTopology, bool usePublisherConfirms, int maxUnconfirmed = 100)
+        public NextChannel(IChannel channel, IRoutingTopology routingTopology, bool usePublisherConfirms, int maxUnconfirmed = 100)
         {
-            if (usePublisherConfirms)
-                channel = connection.CreateChannelWithPublishConfirmation(maxunconfirmedMessages: maxUnconfirmed).Result;
-            else
-                channel = connection.CreateChannel().Result;
+            this.channel = channel;
             
             this.routingTopology = routingTopology;
             
         }
+        
 
         public BasicProperties RentBasicProperties() => channel.RentBasicProperties();
         public void ReturnBasicProperties(BasicProperties props) => channel.Return(props);
@@ -50,7 +48,7 @@ namespace NServiceBus.Transport.RabbitMQ
             }
             disposed = true;
         }
-
+        
         IChannel channel;
         readonly IRoutingTopology routingTopology;
         bool disposed;
